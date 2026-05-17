@@ -24,6 +24,9 @@
     <string name="perm_change">Cambiar</string>
 
     <string name="questions_cache_title">Banco de preguntas</string>
+    <string name="questions_official_title">Preguntas oficiales (practitioner)</string>
+    <string name="questions_synthetic_title">Preguntas sintéticas</string>
+    <string name="questions_synthetic_hint">Generadas automáticamente. Útiles para variedad, contrasta antes de fiarte.</string>
     <string name="questions_cached_count">Preguntas en caché: %1$d</string>
     <string name="never_synced">Aún no se ha sincronizado.</string>
     <string name="last_sync">Última sincronización: %1$s</string>

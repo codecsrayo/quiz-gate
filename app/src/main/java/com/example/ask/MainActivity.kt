@@ -104,13 +104,15 @@ private fun SetupScreen(modifier: Modifier = Modifier) {
     var maxMinutes by remember { mutableIntStateOf(Prefs.getMaxInAppMinutes(context)) }
     var availableDomains by remember { mutableStateOf<List<Pair<String, String>>>(emptyList()) }
     var enabledDomains by remember { mutableStateOf(Prefs.getEnabledDomains(context)) }
-    var cacheCount by remember { mutableIntStateOf(0) }
+    var realCount by remember { mutableIntStateOf(0) }
+    var syntheticCount by remember { mutableIntStateOf(0) }
     var lastFetch by remember { mutableLongStateOf(Prefs.getLastFetch(context)) }
     var syncing by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         val cached = repo.loadCached()
-        cacheCount = cached.size
+        realCount = cached.count { !it.synthetic }
+        syntheticCount = cached.count { it.synthetic }
         availableDomains = cached
             .groupBy { it.domain }
             .map { (dom, qs) -> dom to (qs.first().domainText(lang).ifBlank { dom }) }
@@ -163,40 +165,57 @@ private fun SetupScreen(modifier: Modifier = Modifier) {
 
             ElevatedCard {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(stringResource(R.string.questions_cache_title), style = MaterialTheme.typography.titleMedium)
-                    Text(stringResource(R.string.questions_cached_count, cacheCount))
+                    Text(stringResource(R.string.questions_official_title), style = MaterialTheme.typography.titleMedium)
+                    Text(stringResource(R.string.questions_cached_count, realCount))
                     Text(
                         if (lastFetch == 0L) stringResource(R.string.never_synced)
                         else stringResource(R.string.last_sync, formatTime(lastFetch))
                     )
-                    Row {
-                        Button(
-                            enabled = !syncing,
-                            onClick = {
-                                scope.launch {
-                                    syncing = true
-                                    val r = repo.refreshFromNetwork()
-                                    r.onSuccess { n ->
-                                        cacheCount = n
+                    OutlinedTextField(
+                        value = apiUrl,
+                        onValueChange = { apiUrl = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        label = { Text(stringResource(R.string.api_url_title)) }
+                    )
+                    Button(
+                        enabled = !syncing,
+                        onClick = {
+                            val cleaned = apiUrl.trim()
+                            apiUrl = cleaned
+                            Prefs.setApiUrl(context, cleaned)
+                            scope.launch {
+                                syncing = true
+                                repo.refreshFromNetwork()
+                                    .onSuccess { n ->
                                         lastFetch = Prefs.getLastFetch(context)
-                                        snackbar.showSnackbar("Sincronizadas $n preguntas")
-                                    }.onFailure {
+                                        val cached = repo.loadCached()
+                                        realCount = cached.count { !it.synthetic }
+                                        syntheticCount = cached.count { it.synthetic }
+                                        availableDomains = cached
+                                            .groupBy { it.domain }
+                                            .map { (dom, qs) -> dom to (qs.first().domainText(lang).ifBlank { dom }) }
+                                            .sortedBy { it.second }
+                                        snackbar.showSnackbar(
+                                            "Sincronizadas $n (oficiales=$realCount · sintéticas=$syntheticCount)"
+                                        )
+                                    }
+                                    .onFailure {
                                         snackbar.showSnackbar("Error: ${it.message ?: "desconocido"}")
                                     }
-                                    syncing = false
-                                }
+                                syncing = false
                             }
-                        ) {
-                            if (syncing) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(18.dp),
-                                    strokeWidth = 2.dp,
-                                    color = MaterialTheme.colorScheme.onPrimary
-                                )
-                                Spacer(Modifier.width(8.dp))
-                            }
-                            Text(stringResource(R.string.sync_now))
                         }
+                    ) {
+                        if (syncing) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                strokeWidth = 2.dp,
+                                color = MaterialTheme.colorScheme.onPrimary
+                            )
+                            Spacer(Modifier.width(8.dp))
+                        }
+                        Text(stringResource(R.string.sync_now))
                     }
                     Spacer(Modifier.height(4.dp))
                     Text(stringResource(R.string.language_title), style = MaterialTheme.typography.titleSmall)
@@ -213,6 +232,14 @@ private fun SetupScreen(modifier: Modifier = Modifier) {
                             label = { Text("English") }
                         )
                     }
+                }
+            }
+
+            ElevatedCard {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(stringResource(R.string.questions_synthetic_title), style = MaterialTheme.typography.titleMedium)
+                    Text(stringResource(R.string.questions_synthetic_hint), style = MaterialTheme.typography.bodySmall)
+                    Text(stringResource(R.string.questions_cached_count, syntheticCount))
                 }
             }
 
@@ -345,54 +372,6 @@ private fun SetupScreen(modifier: Modifier = Modifier) {
                 }
             }
 
-            ElevatedCard {
-                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(stringResource(R.string.api_url_title), style = MaterialTheme.typography.titleMedium)
-                    OutlinedTextField(
-                        value = apiUrl,
-                        onValueChange = { apiUrl = it },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true
-                    )
-                    Button(
-                        enabled = !syncing,
-                        onClick = {
-                            val cleaned = apiUrl.trim()
-                            apiUrl = cleaned
-                            Prefs.setApiUrl(context, cleaned)
-                            scope.launch {
-                                syncing = true
-                                snackbar.showSnackbar("URL guardada, sincronizando…")
-                                repo.refreshFromNetwork()
-                                    .onSuccess { n ->
-                                        cacheCount = n
-                                        lastFetch = Prefs.getLastFetch(context)
-                                        val cached = repo.loadCached()
-                                        availableDomains = cached
-                                            .groupBy { it.domain }
-                                            .map { (dom, qs) -> dom to (qs.first().domainText(lang).ifBlank { dom }) }
-                                            .sortedBy { it.second }
-                                        snackbar.showSnackbar("Sincronizadas $n preguntas")
-                                    }
-                                    .onFailure {
-                                        snackbar.showSnackbar("Error: ${it.message ?: "desconocido"}")
-                                    }
-                                syncing = false
-                            }
-                        }
-                    ) {
-                        if (syncing) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(18.dp),
-                                strokeWidth = 2.dp,
-                                color = MaterialTheme.colorScheme.onPrimary
-                            )
-                            Spacer(Modifier.width(8.dp))
-                        }
-                        Text(stringResource(R.string.save_settings))
-                    }
-                }
-            }
         }
     }
 }
