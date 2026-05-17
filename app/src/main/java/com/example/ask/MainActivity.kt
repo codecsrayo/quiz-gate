@@ -8,6 +8,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.FlowRow
 import androidx.core.content.ContextCompat
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -96,12 +97,19 @@ private fun SetupScreen(modifier: Modifier = Modifier) {
     var apiUrl by remember { mutableStateOf(Prefs.getApiUrl(context)) }
     var lang by remember { mutableStateOf(Prefs.getLang(context)) }
     var maxMinutes by remember { mutableIntStateOf(Prefs.getMaxInAppMinutes(context)) }
+    var availableDomains by remember { mutableStateOf<List<Pair<String, String>>>(emptyList()) }
+    var enabledDomains by remember { mutableStateOf(Prefs.getEnabledDomains(context)) }
     var cacheCount by remember { mutableIntStateOf(0) }
     var lastFetch by remember { mutableLongStateOf(Prefs.getLastFetch(context)) }
     var syncing by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
-        cacheCount = repo.loadCached().size
+        val cached = repo.loadCached()
+        cacheCount = cached.size
+        availableDomains = cached
+            .groupBy { it.domain }
+            .map { (dom, qs) -> dom to (qs.first().domainText(lang).ifBlank { dom }) }
+            .sortedBy { it.second }
     }
 
     DisposableEffect(lifecycleOwner) {
@@ -226,6 +234,31 @@ private fun SetupScreen(modifier: Modifier = Modifier) {
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
+                        }
+                    }
+                }
+            }
+
+            if (availableDomains.isNotEmpty()) {
+                ElevatedCard {
+                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(stringResource(R.string.domain_filter_title), style = MaterialTheme.typography.titleMedium)
+                        Text(stringResource(R.string.domain_filter_hint), style = MaterialTheme.typography.bodySmall)
+                        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            availableDomains.forEach { (key, label) ->
+                                val selected = key in enabledDomains
+                                FilterChip(
+                                    selected = selected,
+                                    onClick = {
+                                        val next = enabledDomains.toMutableSet().apply {
+                                            if (selected) remove(key) else add(key)
+                                        }
+                                        enabledDomains = next
+                                        Prefs.setEnabledDomains(context, next)
+                                    },
+                                    label = { Text(label) }
+                                )
+                            }
                         }
                     }
                 }

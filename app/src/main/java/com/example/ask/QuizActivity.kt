@@ -101,9 +101,17 @@ private fun QuizGateScreen(onUnlock: () -> Unit, onCancel: () -> Unit) {
     var state by remember { mutableStateOf<UiState>(UiState.Loading) }
 
     fun pickRandom(): UiState {
-        val q = pool.randomOrNull()
-            ?: return UiState.Error("No hay preguntas en caché. Abre la app principal y pulsa 'Sincronizar'.")
-        return UiState.Showing(q, selected = emptySet(), checked = false)
+        if (pool.isEmpty()) {
+            return UiState.Error("No hay preguntas en caché. Abre la app principal y pulsa 'Sincronizar'.")
+        }
+        val enabledDomains = Prefs.getEnabledDomains(context)
+        val byDomain = if (enabledDomains.isEmpty()) pool
+            else pool.filter { it.domain in enabledDomains }
+        if (byDomain.isEmpty()) {
+            return UiState.Error("Ningún dominio seleccionado tiene preguntas. Ajusta el filtro.")
+        }
+        val chosen = byDomain.random()
+        return UiState.Showing(chosen, selected = emptySet(), checked = false)
     }
 
     LaunchedEffect(Unit) {

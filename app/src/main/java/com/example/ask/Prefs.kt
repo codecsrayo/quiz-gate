@@ -14,6 +14,7 @@ object Prefs {
     private const val KEY_LAST_FETCH_MS = "last_fetch_ms"
     private const val KEY_LANG = "lang"
     private const val KEY_MAX_IN_APP_MIN = "max_in_app_min"
+    private const val KEY_ENABLED_DOMAINS = "enabled_domains"
 
     const val DEFAULT_API_URL = "https://codecsrayo.com/api/quiz/practitioner"
     const val DEFAULT_LANG = "es"
@@ -128,5 +129,13 @@ object Prefs {
 
     fun clearSessionStart(ctx: Context, pkg: String) {
         sp(ctx).edit().remove("$KEY_SESSION_START_PREFIX$pkg").apply()
+    }
+
+    /** Empty set means "all domains enabled". */
+    fun getEnabledDomains(ctx: Context): Set<String> =
+        sp(ctx).getStringSet(KEY_ENABLED_DOMAINS, emptySet()) ?: emptySet()
+
+    fun setEnabledDomains(ctx: Context, domains: Set<String>) {
+        sp(ctx).edit().putStringSet(KEY_ENABLED_DOMAINS, domains).apply()
     }
 }
