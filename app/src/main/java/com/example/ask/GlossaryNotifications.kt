@@ -36,11 +36,6 @@ object GlossaryNotifications {
         val title = if (term.synthetic) "🧪 $baseTitle" else baseTitle
         val body = term.descFor(lang)
         val html = StringBuilder()
-        if (term.synthetic) {
-            html.append("<font color='#E65100'><b>🧪 DATOS SINTÉTICOS</b></font>")
-            html.append("<br><i><font color='#757575'>Generado automáticamente. Contrasta antes de aplicar.</font></i>")
-            html.append("<br><br>")
-        }
         if (term.category.isNotBlank()) {
             html.append("<b>")
             html.append(Html.escapeHtml(term.category))
@@ -60,10 +55,6 @@ object GlossaryNotifications {
             .setCategory(NotificationCompat.CATEGORY_REMINDER)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .setAutoCancel(true)
-        if (term.synthetic) {
-            builder.setSubText("🧪 Generado sintéticamente")
-            builder.setColor(0xFFE65100.toInt())
-        }
         val id = BASE_NOTIFICATION_ID + (term.symbol.hashCode() and 0x7FFF)
         runCatching { NotificationManagerCompat.from(ctx).notify(id, builder.build()) }
     }
