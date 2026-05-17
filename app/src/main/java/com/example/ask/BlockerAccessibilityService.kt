@@ -9,6 +9,11 @@ import android.os.Looper
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 
+private val IN_APP_TIMER_EXEMPT = setOf(
+    "com.whatsapp",
+    "com.whatsapp.w4b",
+)
+
 private val TRANSIENT_PKGS = setOf(
     "com.android.systemui",
     "com.miui.home",
@@ -113,12 +118,14 @@ class BlockerAccessibilityService : AccessibilityService() {
         // Re-entering within session window
         if (Prefs.isWithinSessionWindow(this, pkg)) {
             Prefs.touchLastSeen(this, pkg)
-            val maxMs = Prefs.getMaxInAppMs(this)
-            val start = Prefs.getSessionStart(this, pkg)
-            if (maxMs > 0 && start > 0L && System.currentTimeMillis() - start >= maxMs) {
-                Log.i(TAG, "in-app limit exceeded on re-entry to $pkg → quiz")
-                triggerQuiz(pkg, resetSession = true)
-                return
+            if (pkg !in IN_APP_TIMER_EXEMPT) {
+                val maxMs = Prefs.getMaxInAppMs(this)
+                val start = Prefs.getSessionStart(this, pkg)
+                if (maxMs > 0 && start > 0L && System.currentTimeMillis() - start >= maxMs) {
+                    Log.i(TAG, "in-app limit exceeded on re-entry to $pkg → quiz")
+                    triggerQuiz(pkg, resetSession = true)
+                    return
+                }
             }
             scheduleInAppTimeout(pkg)
             return
@@ -137,6 +144,7 @@ class BlockerAccessibilityService : AccessibilityService() {
 
     private fun scheduleInAppTimeout(pkg: String) {
         cancelTimeout()
+        if (pkg in IN_APP_TIMER_EXEMPT) return
         val maxMs = Prefs.getMaxInAppMs(this)
         if (maxMs <= 0) return
         val start = Prefs.getSessionStart(this, pkg).takeIf { it > 0L }
