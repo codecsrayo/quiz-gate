@@ -1,7 +1,9 @@
 package com.example.ask
 
 import android.accessibilityservice.AccessibilityService
+import android.content.Context
 import android.content.Intent
+import android.media.AudioManager
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
@@ -81,6 +83,15 @@ class BlockerAccessibilityService : AccessibilityService() {
             return
         }
 
+        // If a voice/video call is active (ringing or in-call), let the user answer
+        // it without going through the quiz. Refresh session so post-call return
+        // also doesn't immediately trigger.
+        if (isInCall()) {
+            Log.i(TAG, "active call detected, bypassing quiz for $pkg")
+            Prefs.touchLastSeen(this, pkg)
+            return
+        }
+
         // Entering a blocked app via fresh unlock from quiz
         if (Prefs.consumePendingUnlock(this, pkg)) {
             Log.i(TAG, "consumed pending unlock for $pkg")
@@ -153,6 +164,16 @@ class BlockerAccessibilityService : AccessibilityService() {
         }
         runCatching { startActivity(intent) }
             .onFailure { Log.e(TAG, "startActivity QuizActivity failed", it) }
+    }
+
+    private fun isInCall(): Boolean {
+        val am = getSystemService(Context.AUDIO_SERVICE) as? AudioManager ?: return false
+        return when (am.mode) {
+            AudioManager.MODE_IN_CALL,
+            AudioManager.MODE_IN_COMMUNICATION,
+            AudioManager.MODE_RINGTONE -> true
+            else -> false
+        }
     }
 
     private fun isSystemPackage(pkg: String): Boolean {
