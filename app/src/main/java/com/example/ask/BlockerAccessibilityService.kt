@@ -28,13 +28,27 @@ class BlockerAccessibilityService : AccessibilityService() {
         if (pkg == prev) return
         lastForegroundPkg = pkg
 
+        val blocked = Prefs.getBlockedPackages(this)
+
+        // If we are LEAVING a blocked app (or quiz activity), record its last-seen time
+        // so brief excursions don't re-trigger the quiz on return.
+        if (prev != null && prev != pkg && prev in blocked) {
+            Prefs.touchLastSeen(this, prev)
+        }
+
         if (pkg == packageName) return
 
-        val blocked = Prefs.getBlockedPackages(this)
         if (pkg !in blocked) return
 
         if (Prefs.consumePendingUnlock(this, pkg)) {
             Log.i(TAG, "consumed pending unlock for $pkg")
+            Prefs.touchLastSeen(this, pkg)
+            return
+        }
+
+        if (Prefs.isWithinSessionWindow(this, pkg)) {
+            Log.i(TAG, "in active session for $pkg, skipping quiz")
+            Prefs.touchLastSeen(this, pkg)
             return
         }
 
@@ -48,15 +62,11 @@ class BlockerAccessibilityService : AccessibilityService() {
         Log.i(TAG, "blocking $pkg → launching QuizActivity")
         Prefs.setLastBlockedPackage(this, pkg)
         WatchdogService.start(this)
-        performGlobalAction(GLOBAL_ACTION_HOME)
 
         val intent = Intent(this, QuizActivity::class.java).apply {
             addFlags(
                 Intent.FLAG_ACTIVITY_NEW_TASK or
-                    Intent.FLAG_ACTIVITY_CLEAR_TOP or
-                    Intent.FLAG_ACTIVITY_SINGLE_TOP or
-                    Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS or
-                    Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
+                    Intent.FLAG_ACTIVITY_CLEAR_TASK
             )
             putExtra(QuizActivity.EXTRA_TRIGGER_PKG, pkg)
         }
