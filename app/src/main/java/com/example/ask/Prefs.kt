@@ -17,6 +17,8 @@ object Prefs {
     const val DEFAULT_API_URL = "https://codecsrayo.com/api/quiz/practitioner"
     const val DEFAULT_LANG = "es"
     private const val PENDING_UNLOCK_TTL_MS = 60_000L
+    private const val SESSION_WINDOW_MS = 5 * 60_000L
+    private const val KEY_LAST_SEEN_PREFIX = "last_seen_"
 
     val DEFAULT_BLOCKED: Set<String> = setOf(
         "com.facebook.katana",
@@ -89,4 +91,18 @@ object Prefs {
 
     fun getLastFetch(ctx: Context): Long =
         sp(ctx).getLong(KEY_LAST_FETCH_MS, 0L)
+
+    fun touchLastSeen(ctx: Context, pkg: String) {
+        sp(ctx).edit().putLong("$KEY_LAST_SEEN_PREFIX$pkg", System.currentTimeMillis()).apply()
+    }
+
+    fun isWithinSessionWindow(ctx: Context, pkg: String): Boolean {
+        val ls = sp(ctx).getLong("$KEY_LAST_SEEN_PREFIX$pkg", 0L)
+        if (ls == 0L) return false
+        return System.currentTimeMillis() - ls < SESSION_WINDOW_MS
+    }
+
+    fun clearLastSeen(ctx: Context, pkg: String) {
+        sp(ctx).edit().remove("$KEY_LAST_SEEN_PREFIX$pkg").apply()
+    }
 }
