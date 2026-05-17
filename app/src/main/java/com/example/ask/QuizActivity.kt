@@ -84,7 +84,7 @@ private sealed interface UiState {
     data class Error(val message: String) : UiState
     data class Showing(
         val question: Question,
-        val selected: Int?,
+        val selected: Set<Int>,
         val checked: Boolean,
     ) : UiState
 }
@@ -102,7 +102,7 @@ private fun QuizGateScreen(onUnlock: () -> Unit, onCancel: () -> Unit) {
     fun pickRandom(): UiState {
         val q = pool.randomOrNull()
             ?: return UiState.Error("No hay preguntas en caché. Abre la app principal y pulsa 'Sincronizar'.")
-        return UiState.Showing(q, selected = null, checked = false)
+        return UiState.Showing(q, selected = emptySet(), checked = false)
     }
 
     LaunchedEffect(Unit) {
@@ -175,7 +175,15 @@ private fun QuizGateScreen(onUnlock: () -> Unit, onCancel: () -> Unit) {
                 is UiState.Showing -> QuestionView(
                     state = s,
                     lang = lang,
-                    onSelect = { idx -> state = s.copy(selected = idx) },
+                    onToggle = { idx ->
+                        val cur = s.selected
+                        val next = if (s.question.isMultiResponse) {
+                            if (idx in cur) cur - idx else cur + idx
+                        } else {
+                            setOf(idx)
+                        }
+                        state = s.copy(selected = next)
+                    },
                     onCheck = { state = s.copy(checked = true) },
                     onNext = { state = pickRandom() },
                 )
@@ -185,7 +193,8 @@ private fun QuizGateScreen(onUnlock: () -> Unit, onCancel: () -> Unit) {
         Spacer(Modifier.height(8.dp))
         Row(modifier = Modifier.fillMaxWidth()) {
             val current = state as? UiState.Showing
-            val isCorrect = current != null && current.checked && current.selected == current.question.answer
+            val isCorrect = current != null && current.checked &&
+                current.selected == current.question.correctAnswers()
             Button(
                 onClick = onUnlock,
                 enabled = isCorrect,
@@ -201,11 +210,12 @@ private fun QuizGateScreen(onUnlock: () -> Unit, onCancel: () -> Unit) {
 private fun QuestionView(
     state: UiState.Showing,
     lang: String,
-    onSelect: (Int) -> Unit,
+    onToggle: (Int) -> Unit,
     onCheck: () -> Unit,
     onNext: () -> Unit,
 ) {
     val q = state.question
+    val correct = q.correctAnswers()
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -216,6 +226,13 @@ private fun QuestionView(
             AssistChip(onClick = {}, label = { Text(q.domainText(lang)) })
             Spacer(Modifier.width(8.dp))
             Text(q.id, style = MaterialTheme.typography.labelSmall)
+            if (q.isMultiResponse) {
+                Spacer(Modifier.width(8.dp))
+                AssistChip(
+                    onClick = {},
+                    label = { Text("Multi (${correct.size})") }
+                )
+            }
         }
 
         Text(q.statement(lang), style = MaterialTheme.typography.titleMedium)
@@ -225,15 +242,17 @@ private fun QuestionView(
 
         val opts = q.optionsFor(lang)
         opts.forEachIndexed { idx, opt ->
+            val isSelected = idx in state.selected
+            val isCorrectOpt = idx in correct
             val bg: Color = when {
-                state.checked && idx == q.answer -> successBg
-                state.checked && idx == state.selected && idx != q.answer -> errorBg
-                state.selected == idx -> MaterialTheme.colorScheme.surfaceVariant
+                state.checked && isCorrectOpt -> successBg
+                state.checked && isSelected && !isCorrectOpt -> errorBg
+                isSelected -> MaterialTheme.colorScheme.surfaceVariant
                 else -> MaterialTheme.colorScheme.surface
             }
             val fg: Color = when {
-                state.checked && idx == q.answer -> successFg
-                state.checked && idx == state.selected && idx != q.answer -> errorFg
+                state.checked && isCorrectOpt -> successFg
+                state.checked && isSelected && !isCorrectOpt -> errorFg
                 else -> MaterialTheme.colorScheme.onSurface
             }
             Surface(
@@ -244,20 +263,28 @@ private fun QuestionView(
                 modifier = Modifier
                     .fillMaxWidth()
                     .selectable(
-                        selected = state.selected == idx,
+                        selected = isSelected,
                         enabled = !state.checked,
-                        onClick = { onSelect(idx) }
+                        onClick = { onToggle(idx) }
                     )
             ) {
                 Row(
                     modifier = Modifier.padding(12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    RadioButton(
-                        selected = state.selected == idx,
-                        enabled = !state.checked,
-                        onClick = { onSelect(idx) }
-                    )
+                    if (q.isMultiResponse) {
+                        Checkbox(
+                            checked = isSelected,
+                            enabled = !state.checked,
+                            onCheckedChange = { onToggle(idx) }
+                        )
+                    } else {
+                        RadioButton(
+                            selected = isSelected,
+                            enabled = !state.checked,
+                            onClick = { onToggle(idx) }
+                        )
+                    }
                     Spacer(Modifier.width(8.dp))
                     Text(opt, modifier = Modifier.weight(1f))
                 }
@@ -267,11 +294,16 @@ private fun QuestionView(
         if (!state.checked) {
             Button(
                 onClick = onCheck,
-                enabled = state.selected != null,
+                enabled = state.selected.isNotEmpty(),
                 modifier = Modifier.fillMaxWidth()
-            ) { Text("Comprobar") }
+            ) {
+                Text(
+                    if (q.isMultiResponse) "Comprobar (selecciona todas las correctas)"
+                    else "Comprobar"
+                )
+            }
         } else {
-            val isCorrect = state.selected == q.answer
+            val isCorrect = state.selected == correct
             Surface(
                 shape = RoundedCornerShape(8.dp),
                 color = if (isCorrect) successBg else errorBg,

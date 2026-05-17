@@ -12,9 +12,15 @@ data class Question(
     val q: Map<String, String>,
     val options: Map<String, List<String>>,
     val answer: Int,
+    val answers: List<Int>,
     val explanation: Map<String, String>,
     val tip: Map<String, String>,
 ) {
+    val isMultiResponse: Boolean get() = questionType == "multiple-response"
+
+    fun correctAnswers(): Set<Int> =
+        if (answers.isNotEmpty()) answers.toSet() else setOf(answer)
+
     fun statement(lang: String): String = q[lang] ?: q["es"] ?: q.values.firstOrNull().orEmpty()
     fun optionsFor(lang: String): List<String> =
         options[lang] ?: options["es"] ?: options.values.firstOrNull().orEmpty()
@@ -47,6 +53,7 @@ object QuestionParser {
         q = stringMap(o.optJSONObject("q")),
         options = stringListMap(o.optJSONObject("options")),
         answer = o.optInt("answer", 0),
+        answers = intList(o.optJSONArray("answers")),
         explanation = stringMap(o.optJSONObject("explanation")),
         tip = stringMap(o.optJSONObject("tip")),
     )
@@ -74,5 +81,12 @@ object QuestionParser {
             m[k] = list
         }
         return m
+    }
+
+    private fun intList(arr: JSONArray?): List<Int> {
+        if (arr == null) return emptyList()
+        val out = ArrayList<Int>(arr.length())
+        for (i in 0 until arr.length()) out.add(arr.optInt(i))
+        return out
     }
 }
