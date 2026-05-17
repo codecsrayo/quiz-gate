@@ -1,10 +1,12 @@
 package com.example.ask
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
@@ -14,7 +16,12 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -55,11 +62,193 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             AskTheme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { padding ->
-                    SetupScreen(modifier = Modifier.padding(padding))
+                AppRoot()
+            }
+        }
+    }
+}
+
+private enum class Screen { Home, Config }
+
+@Composable
+private fun AppRoot() {
+    var screen by rememberSaveable { mutableStateOf(Screen.Home) }
+    val context = LocalContext.current
+
+    BackHandler(enabled = screen == Screen.Config) { screen = Screen.Home }
+
+    when (screen) {
+        Screen.Home -> HomeScreen(
+            onStartQuiz = {
+                val intent = Intent(context, QuizActivity::class.java)
+                    .putExtra(QuizActivity.EXTRA_PRACTICE_MODE, true)
+                context.startActivity(intent)
+            },
+            onOpenConfig = { screen = Screen.Config },
+        )
+        Screen.Config -> ConfigScreen(onBack = { screen = Screen.Home })
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun HomeScreen(onStartQuiz: () -> Unit, onOpenConfig: () -> Unit) {
+    val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val repo = remember { QuizRepository(context) }
+    val scope = rememberCoroutineScope()
+
+    var realCount by remember { mutableIntStateOf(0) }
+    var syntheticCount by remember { mutableIntStateOf(0) }
+    var perms by remember {
+        mutableStateOf(
+            PermStatus(
+                accessibility = Permissions.isAccessibilityEnabled(context),
+                overlay = Permissions.canDrawOverlays(context),
+                battery = Permissions.isIgnoringBatteryOptimizations(context),
+            )
+        )
+    }
+
+    LaunchedEffect(Unit) {
+        val cached = repo.loadCached()
+        realCount = cached.count { !it.synthetic }
+        syntheticCount = cached.count { it.synthetic }
+    }
+
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                perms = PermStatus(
+                    accessibility = Permissions.isAccessibilityEnabled(context),
+                    overlay = Permissions.canDrawOverlays(context),
+                    battery = Permissions.isIgnoringBatteryOptimizations(context),
+                )
+                scope.launch {
+                    val cached = repo.loadCached()
+                    realCount = cached.count { !it.synthetic }
+                    syntheticCount = cached.count { it.synthetic }
                 }
             }
         }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    val totalQuestions = realCount + syntheticCount
+    val canStart = totalQuestions > 0
+    val permsOk = perms.accessibility && perms.overlay && perms.battery
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text(stringResource(R.string.app_name)) },
+                actions = {
+                    IconButton(onClick = onOpenConfig) {
+                        Icon(
+                            Icons.Filled.Settings,
+                            contentDescription = stringResource(R.string.config_title),
+                        )
+                    }
+                }
+            )
+        }
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .padding(padding)
+                .fillMaxSize()
+                .padding(24.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Spacer(Modifier.weight(0.3f))
+
+            Text(
+                text = stringResource(R.string.home_tagline),
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                text = stringResource(R.string.home_subtitle),
+                style = MaterialTheme.typography.bodyMedium,
+            )
+
+            ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(
+                        text = stringResource(R.string.home_bank_count, totalQuestions),
+                        style = MaterialTheme.typography.titleSmall,
+                    )
+                    Text(
+                        text = stringResource(R.string.home_bank_breakdown, realCount, syntheticCount),
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                    if (!permsOk) {
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            text = stringResource(R.string.home_perms_warning),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color(0xFFC62828),
+                        )
+                    }
+                }
+            }
+
+            Button(
+                onClick = onStartQuiz,
+                enabled = canStart,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(64.dp)
+            ) {
+                Icon(Icons.Filled.PlayArrow, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    text = stringResource(R.string.home_start_quiz),
+                    style = MaterialTheme.typography.titleMedium,
+                )
+            }
+            if (!canStart) {
+                Text(
+                    text = stringResource(R.string.home_start_disabled_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+
+            OutlinedButton(
+                onClick = onOpenConfig,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Icon(Icons.Filled.Settings, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text(stringResource(R.string.home_open_config))
+            }
+
+            Spacer(Modifier.weight(1f))
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ConfigScreen(onBack: () -> Unit) {
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text(stringResource(R.string.config_title)) },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = stringResource(R.string.back),
+                        )
+                    }
+                }
+            )
+        }
+    ) { padding ->
+        SetupScreen(modifier = Modifier.padding(padding))
     }
 }
 

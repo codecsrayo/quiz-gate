@@ -3,6 +3,17 @@
     <string name="accessibility_service_label">Quiz Gate Blocker</string>
     <string name="accessibility_service_description">Detecta cuando abres Facebook, WhatsApp o Instagram y te muestra una pregunta del quiz antes de dejarte continuar.</string>
 
+    <string name="home_tagline">Practica para el examen.</string>
+    <string name="home_subtitle">Inicia el quiz manualmente o deja que aparezca al abrir las apps bloqueadas.</string>
+    <string name="home_bank_count">Banco de preguntas: %1$d</string>
+    <string name="home_bank_breakdown">Oficiales y sintéticas combinadas. Configura el banco desde Configuración.</string>
+    <string name="home_perms_warning">Faltan permisos: el bloqueo automático no funcionará hasta que los concedas en Configuración.</string>
+    <string name="home_start_quiz">Iniciar quiz</string>
+    <string name="home_start_disabled_hint">Sin preguntas en caché. Abre Configuración y pulsa “Sincronizar ahora”.</string>
+    <string name="home_open_config">Configuración</string>
+    <string name="config_title">Configuración</string>
+    <string name="back">Atrás</string>
+
     <string name="setup_title">Quiz Gate</string>
     <string name="setup_intro">Antes de abrir Facebook, WhatsApp o Instagram, esta app te obliga a acertar una pregunta del quiz.</string>
     <string name="open_accessibility_settings">Abrir configuración de Accesibilidad</string>
