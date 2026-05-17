@@ -20,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.ask.ui.theme.AskTheme
 import kotlinx.coroutines.launch
@@ -225,14 +226,13 @@ private fun QuestionView(
         Row(verticalAlignment = Alignment.CenterVertically) {
             AssistChip(onClick = {}, label = { Text(q.domainText(lang)) })
             Spacer(Modifier.width(8.dp))
-            Text(q.id, style = MaterialTheme.typography.labelSmall)
-            if (q.isMultiResponse) {
-                Spacer(Modifier.width(8.dp))
-                AssistChip(
-                    onClick = {},
-                    label = { Text("Multi (${correct.size})") }
-                )
-            }
+            Text(
+                text = if (q.isMultiResponse) "${q.id} · Multi×${correct.size}" else q.id,
+                style = MaterialTheme.typography.labelSmall,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f)
+            )
         }
 
         Text(q.statement(lang), style = MaterialTheme.typography.titleMedium)
