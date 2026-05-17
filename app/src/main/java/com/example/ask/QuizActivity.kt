@@ -110,7 +110,12 @@ private fun QuizGateScreen(onUnlock: () -> Unit, onCancel: () -> Unit) {
         if (byDomain.isEmpty()) {
             return UiState.Error("Ningún dominio seleccionado tiene preguntas. Ajusta el filtro.")
         }
-        val chosen = byDomain.random()
+        val recent = Prefs.getRecentQuestionIds(context).toSet()
+        val candidates = byDomain.filterNot { it.id in recent }
+            .ifEmpty { byDomain }
+        val chosen = candidates.random()
+        val maxRecent = (pool.size / 2).coerceIn(5, 30)
+        Prefs.pushRecentQuestionId(context, chosen.id, maxRecent)
         return UiState.Showing(chosen, selected = emptySet(), checked = false)
     }
 

@@ -15,6 +15,7 @@ object Prefs {
     private const val KEY_LANG = "lang"
     private const val KEY_MAX_IN_APP_MIN = "max_in_app_min"
     private const val KEY_ENABLED_DOMAINS = "enabled_domains"
+    private const val KEY_RECENT_QUESTION_IDS = "recent_question_ids"
 
     const val DEFAULT_API_URL = "https://codecsrayo.com/api/quiz/practitioner"
     const val DEFAULT_LANG = "es"
@@ -137,5 +138,19 @@ object Prefs {
 
     fun setEnabledDomains(ctx: Context, domains: Set<String>) {
         sp(ctx).edit().putStringSet(KEY_ENABLED_DOMAINS, domains).apply()
+    }
+
+    fun getRecentQuestionIds(ctx: Context): List<String> {
+        val raw = sp(ctx).getString(KEY_RECENT_QUESTION_IDS, "") ?: ""
+        return if (raw.isEmpty()) emptyList() else raw.split('|')
+    }
+
+    fun pushRecentQuestionId(ctx: Context, id: String, maxSize: Int) {
+        if (maxSize <= 0) return
+        val current = getRecentQuestionIds(ctx).toMutableList()
+        current.remove(id)
+        current.add(id)
+        while (current.size > maxSize) current.removeAt(0)
+        sp(ctx).edit().putString(KEY_RECENT_QUESTION_IDS, current.joinToString("|")).apply()
     }
 }
