@@ -83,6 +83,15 @@ class BlockerAccessibilityService : AccessibilityService() {
             return
         }
 
+        // Entering any blocked app ends every OTHER blocked app's session:
+        // only one blocked app can be "in active session" at a time.
+        for (bpkg in blocked) {
+            if (bpkg != pkg) {
+                Prefs.clearLastSeen(this, bpkg)
+                Prefs.clearSessionStart(this, bpkg)
+            }
+        }
+
         // If a voice/video call is active (ringing or in-call), let the user answer
         // it without going through the quiz. Refresh session so post-call return
         // also doesn't immediately trigger.
