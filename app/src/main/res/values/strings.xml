@@ -38,4 +38,11 @@
     <string name="max_in_app_label">Minutos</string>
     <string name="domain_filter_title">Dominios incluidos</string>
     <string name="domain_filter_hint">Sin selección = todos.</string>
+
+    <string name="glossary_push_title">Glosario AWS por notificación</string>
+    <string name="glossary_push_hint">Recibe un término del glosario cada cierto tiempo.</string>
+    <string name="glossary_push_enabled">Activado</string>
+    <string name="glossary_push_interval">Cada</string>
+    <string name="glossary_push_test">Probar ahora</string>
+    <string name="glossary_url_title">URL del glosario</string>
 </resources>

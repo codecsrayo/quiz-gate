@@ -50,6 +50,8 @@ class MainActivity : ComponentActivity() {
         }
 
         WatchdogService.start(this)
+        GlossaryNotifications.ensureChannel(this)
+        GlossaryPushWorker.applyFromPrefs(this)
 
         setContent {
             AskTheme {
@@ -95,6 +97,9 @@ private fun SetupScreen(modifier: Modifier = Modifier) {
     }
     var blocked by remember { mutableStateOf(Prefs.getBlockedPackages(context)) }
     var apiUrl by remember { mutableStateOf(Prefs.getApiUrl(context)) }
+    var glossaryUrl by remember { mutableStateOf(Prefs.getGlossaryApiUrl(context)) }
+    var glossaryPushEnabled by remember { mutableStateOf(Prefs.isGlossaryPushEnabled(context)) }
+    var glossaryInterval by remember { mutableIntStateOf(Prefs.getGlossaryPushIntervalMin(context)) }
     var lang by remember { mutableStateOf(Prefs.getLang(context)) }
     var maxMinutes by remember { mutableIntStateOf(Prefs.getMaxInAppMinutes(context)) }
     var availableDomains by remember { mutableStateOf<List<Pair<String, String>>>(emptyList()) }
@@ -280,6 +285,68 @@ private fun SetupScreen(modifier: Modifier = Modifier) {
 
             ElevatedCard {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(stringResource(R.string.glossary_push_title), style = MaterialTheme.typography.titleMedium)
+                    Text(stringResource(R.string.glossary_push_hint), style = MaterialTheme.typography.bodySmall)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(stringResource(R.string.glossary_push_enabled), modifier = Modifier.weight(1f))
+                        Switch(
+                            checked = glossaryPushEnabled,
+                            onCheckedChange = { checked ->
+                                glossaryPushEnabled = checked
+                                Prefs.setGlossaryPushEnabled(context, checked)
+                                GlossaryPushWorker.applyFromPrefs(context)
+                            }
+                        )
+                    }
+                    Text(stringResource(R.string.glossary_push_interval), style = MaterialTheme.typography.titleSmall)
+                    GlossaryIntervalSelector(
+                        value = glossaryInterval,
+                        onChange = { mins ->
+                            glossaryInterval = mins
+                            Prefs.setGlossaryPushIntervalMin(context, mins)
+                            if (glossaryPushEnabled) GlossaryPushWorker.applyFromPrefs(context)
+                        }
+                    )
+                    Text(stringResource(R.string.glossary_url_title), style = MaterialTheme.typography.titleSmall)
+                    OutlinedTextField(
+                        value = glossaryUrl,
+                        onValueChange = { glossaryUrl = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
+                    Row {
+                        Button(onClick = {
+                            val cleaned = glossaryUrl.trim()
+                            glossaryUrl = cleaned
+                            Prefs.setGlossaryApiUrl(context, cleaned)
+                            scope.launch {
+                                val repo = GlossaryRepository(context)
+                                var terms = repo.loadCached()
+                                if (terms.isEmpty()) {
+                                    val r = repo.refreshFromNetwork()
+                                    if (r.isFailure) {
+                                        snackbar.showSnackbar(
+                                            "Error glosario: ${r.exceptionOrNull()?.message ?: "desconocido"}"
+                                        )
+                                        return@launch
+                                    }
+                                    terms = repo.loadCached()
+                                }
+                                if (terms.isEmpty()) {
+                                    snackbar.showSnackbar("Glosario vacío")
+                                    return@launch
+                                }
+                                val term = terms.random()
+                                GlossaryNotifications.postTerm(context, term, lang)
+                                snackbar.showSnackbar("Notificación enviada: ${term.symbol}")
+                            }
+                        }) { Text(stringResource(R.string.glossary_push_test)) }
+                    }
+                }
+            }
+
+            ElevatedCard {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(stringResource(R.string.api_url_title), style = MaterialTheme.typography.titleMedium)
                     OutlinedTextField(
                         value = apiUrl,
@@ -380,6 +447,22 @@ private fun PermissionRow(
 }
 
 private val MAX_MINUTES_OPTIONS = listOf(0, 5, 10, 20, 30, 60)
+private val GLOSSARY_INTERVAL_OPTIONS = listOf(15, 30, 60, 180, 360)
+
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@Composable
+private fun GlossaryIntervalSelector(value: Int, onChange: (Int) -> Unit) {
+    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+        GLOSSARY_INTERVAL_OPTIONS.forEachIndexed { idx, minutes ->
+            SegmentedButton(
+                selected = minutes == value,
+                onClick = { onChange(minutes) },
+                shape = SegmentedButtonDefaults.itemShape(idx, GLOSSARY_INTERVAL_OPTIONS.size),
+                label = { Text(if (minutes < 60) "${minutes}m" else "${minutes / 60}h") }
+            )
+        }
+    }
+}
 
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable

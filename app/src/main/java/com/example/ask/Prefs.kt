@@ -9,6 +9,7 @@ object Prefs {
 
     private const val KEY_BLOCKED = "blocked_packages"
     private const val KEY_API_URL = "api_url"
+    private const val KEY_GLOSSARY_API_URL = "glossary_api_url"
     private const val KEY_PENDING_UNLOCK_PKG = "pending_unlock_pkg"
     private const val KEY_PENDING_UNLOCK_UNTIL = "pending_unlock_until_ms"
     private const val KEY_LAST_BLOCKED_PKG = "last_blocked_package"
@@ -18,8 +19,14 @@ object Prefs {
     private const val KEY_ENABLED_DOMAINS = "enabled_domains"
     private const val KEY_RECENT_QUESTION_IDS = "recent_question_ids"
     private const val KEY_QUESTION_STATS = "question_stats"
+    private const val KEY_LAST_GLOSSARY_FETCH_MS = "last_glossary_fetch_ms"
+    private const val KEY_GLOSSARY_PUSH_ENABLED = "glossary_push_enabled"
+    private const val KEY_GLOSSARY_PUSH_INTERVAL_MIN = "glossary_push_interval_min"
+    private const val KEY_RECENT_GLOSSARY_IDS = "recent_glossary_ids"
 
     const val DEFAULT_API_URL = "https://codecsrayo.com/api/quiz/practitioner"
+    const val DEFAULT_GLOSSARY_API_URL = "https://codecsrayo.com/api/quiz/practitioner/synthetic/glossary"
+    const val DEFAULT_GLOSSARY_PUSH_INTERVAL_MIN = 60
     const val DEFAULT_LANG = "es"
     const val DEFAULT_MAX_IN_APP_MIN = 10
     private const val PENDING_UNLOCK_TTL_MS = 60_000L
@@ -49,6 +56,13 @@ object Prefs {
 
     fun setApiUrl(ctx: Context, url: String) {
         sp(ctx).edit().putString(KEY_API_URL, url).apply()
+    }
+
+    fun getGlossaryApiUrl(ctx: Context): String =
+        sp(ctx).getString(KEY_GLOSSARY_API_URL, DEFAULT_GLOSSARY_API_URL) ?: DEFAULT_GLOSSARY_API_URL
+
+    fun setGlossaryApiUrl(ctx: Context, url: String) {
+        sp(ctx).edit().putString(KEY_GLOSSARY_API_URL, url).apply()
     }
 
     fun getLang(ctx: Context): String =
@@ -98,6 +112,41 @@ object Prefs {
 
     fun getLastFetch(ctx: Context): Long =
         sp(ctx).getLong(KEY_LAST_FETCH_MS, 0L)
+
+    fun setLastGlossaryFetch(ctx: Context, ms: Long) {
+        sp(ctx).edit().putLong(KEY_LAST_GLOSSARY_FETCH_MS, ms).apply()
+    }
+
+    fun getLastGlossaryFetch(ctx: Context): Long =
+        sp(ctx).getLong(KEY_LAST_GLOSSARY_FETCH_MS, 0L)
+
+    fun isGlossaryPushEnabled(ctx: Context): Boolean =
+        sp(ctx).getBoolean(KEY_GLOSSARY_PUSH_ENABLED, false)
+
+    fun setGlossaryPushEnabled(ctx: Context, enabled: Boolean) {
+        sp(ctx).edit().putBoolean(KEY_GLOSSARY_PUSH_ENABLED, enabled).apply()
+    }
+
+    fun getGlossaryPushIntervalMin(ctx: Context): Int =
+        sp(ctx).getInt(KEY_GLOSSARY_PUSH_INTERVAL_MIN, DEFAULT_GLOSSARY_PUSH_INTERVAL_MIN)
+
+    fun setGlossaryPushIntervalMin(ctx: Context, minutes: Int) {
+        sp(ctx).edit().putInt(KEY_GLOSSARY_PUSH_INTERVAL_MIN, minutes.coerceAtLeast(15)).apply()
+    }
+
+    fun getRecentGlossaryIds(ctx: Context): List<String> {
+        val raw = sp(ctx).getString(KEY_RECENT_GLOSSARY_IDS, "") ?: ""
+        return if (raw.isEmpty()) emptyList() else raw.split('|')
+    }
+
+    fun pushRecentGlossaryId(ctx: Context, id: String, maxSize: Int) {
+        if (maxSize <= 0) return
+        val current = getRecentGlossaryIds(ctx).toMutableList()
+        current.remove(id)
+        current.add(id)
+        while (current.size > maxSize) current.removeAt(0)
+        sp(ctx).edit().putString(KEY_RECENT_GLOSSARY_IDS, current.joinToString("|")).apply()
+    }
 
     fun touchLastSeen(ctx: Context, pkg: String) {
         sp(ctx).edit().putLong("$KEY_LAST_SEEN_PREFIX$pkg", System.currentTimeMillis()).apply()
