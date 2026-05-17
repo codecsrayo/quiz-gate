@@ -24,8 +24,8 @@ object Prefs {
     private const val KEY_GLOSSARY_PUSH_INTERVAL_MIN = "glossary_push_interval_min"
     private const val KEY_RECENT_GLOSSARY_IDS = "recent_glossary_ids"
 
-    const val DEFAULT_API_URL = "https://codecsrayo.com/api/quiz/practitioner"
-    const val DEFAULT_GLOSSARY_API_URL = "https://codecsrayo.com/api/quiz/practitioner/synthetic/glossary"
+    const val DEFAULT_API_URL = "https://codecsrayo.com/api/quiz/practitioner/questions"
+    const val DEFAULT_GLOSSARY_API_URL = "https://codecsrayo.com/api/quiz/practitioner/glossary"
     const val DEFAULT_GLOSSARY_PUSH_INTERVAL_MIN = 60
     const val DEFAULT_LANG = "es"
     const val DEFAULT_MAX_IN_APP_MIN = 10
