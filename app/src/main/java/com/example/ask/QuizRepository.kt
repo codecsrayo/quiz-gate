@@ -1,6 +1,7 @@
 package com.example.ask
 
 import android.content.Context
+import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -23,8 +24,10 @@ class QuizRepository(private val context: Context) {
     }
 
     suspend fun refreshFromNetwork(): Result<Int> = withContext(Dispatchers.IO) {
+        val urlStr = Prefs.getApiUrl(context)
         runCatching {
-            val url = URL(Prefs.getApiUrl(context))
+            Log.i(TAG, "GET $urlStr")
+            val url = URL(urlStr)
             val conn = (url.openConnection() as HttpURLConnection).apply {
                 connectTimeout = 10_000
                 readTimeout = 20_000
@@ -35,17 +38,29 @@ class QuizRepository(private val context: Context) {
             try {
                 val code = conn.responseCode
                 if (code !in 200..299) {
+                    val errBody = runCatching {
+                        conn.errorStream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }
+                    }.getOrNull().orEmpty()
+                    Log.w(TAG, "HTTP $code on $urlStr — body=${errBody.take(500)}")
                     error("HTTP $code")
                 }
                 val body = conn.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
+                Log.i(TAG, "HTTP $code on $urlStr — ${body.length} bytes")
                 val parsed = QuestionParser.parseList(body)
-                if (parsed.isEmpty()) error("Respuesta sin preguntas")
+                if (parsed.isEmpty()) {
+                    Log.w(TAG, "Empty parse result from $urlStr — body head=${body.take(200)}")
+                    error("Respuesta sin preguntas")
+                }
                 cacheFile.writeText(body, Charsets.UTF_8)
                 Prefs.setLastFetch(context, System.currentTimeMillis())
                 parsed.size
             } finally {
                 conn.disconnect()
             }
-        }
+        }.onFailure { Log.w(TAG, "refreshFromNetwork failed: ${it.message}", it) }
+    }
+
+    private companion object {
+        const val TAG = "QuizRepo"
     }
 }
