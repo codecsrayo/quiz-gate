@@ -29,43 +29,55 @@ class QuizActivity : ComponentActivity() {
 
     companion object {
         const val EXTRA_TRIGGER_PKG = "trigger_pkg"
+        const val EXTRA_PRACTICE_MODE = "practice_mode"
         private const val TAG = "QuizGate"
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        Log.i(TAG, "QuizActivity onCreate")
+        val practice = intent?.getBooleanExtra(EXTRA_PRACTICE_MODE, false) ?: false
+        Log.i(TAG, "QuizActivity onCreate practice=$practice")
 
         WatchdogService.start(this)
 
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
-            override fun handleOnBackPressed() { /* swallow back */ }
+            override fun handleOnBackPressed() {
+                if (practice) finishAndRemoveTask()
+                // gate mode: swallow back
+            }
         })
 
         setContent {
             AskTheme {
                 Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                     QuizGateScreen(
+                        practiceMode = practice,
                         onUnlock = {
-                            Log.i(TAG, "QuizActivity onUnlock pressed")
-                            val pkg = Prefs.getLastBlockedPackage(this)
-                            if (pkg != null) {
-                                Prefs.setPendingUnlock(this, pkg)
-                                packageManager.getLaunchIntentForPackage(pkg)?.let { launch ->
-                                    launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                    startActivity(launch)
+                            Log.i(TAG, "QuizActivity onUnlock pressed practice=$practice")
+                            if (!practice) {
+                                val pkg = Prefs.getLastBlockedPackage(this)
+                                if (pkg != null) {
+                                    Prefs.setPendingUnlock(this, pkg)
+                                    packageManager.getLaunchIntentForPackage(pkg)?.let { launch ->
+                                        launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                        startActivity(launch)
+                                    }
                                 }
                             }
                             finishAndRemoveTask()
                         },
                         onCancel = {
-                            Log.i(TAG, "QuizActivity onCancel pressed")
-                            Prefs.clearPendingUnlock(this)
-                            val home = Intent(Intent.ACTION_MAIN)
-                                .addCategory(Intent.CATEGORY_HOME)
-                                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                            runCatching { startActivity(home) }
-                            finishAndRemoveTask()
+                            Log.i(TAG, "QuizActivity onCancel pressed practice=$practice")
+                            if (practice) {
+                                finishAndRemoveTask()
+                            } else {
+                                Prefs.clearPendingUnlock(this)
+                                val home = Intent(Intent.ACTION_MAIN)
+                                    .addCategory(Intent.CATEGORY_HOME)
+                                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                runCatching { startActivity(home) }
+                                finishAndRemoveTask()
+                            }
                         },
                     )
                 }
@@ -91,7 +103,11 @@ private sealed interface UiState {
 }
 
 @Composable
-private fun QuizGateScreen(onUnlock: () -> Unit, onCancel: () -> Unit) {
+private fun QuizGateScreen(
+    practiceMode: Boolean,
+    onUnlock: () -> Unit,
+    onCancel: () -> Unit,
+) {
     val context = LocalContext.current
     val repo = remember { QuizRepository(context) }
     val scope = rememberCoroutineScope()
@@ -226,13 +242,26 @@ private fun QuizGateScreen(onUnlock: () -> Unit, onCancel: () -> Unit) {
             val current = state as? UiState.Showing
             val isCorrect = current != null && current.checked &&
                 current.selected == current.question.correctAnswers()
-            Button(
-                onClick = onUnlock,
-                enabled = isCorrect,
-                modifier = Modifier.weight(2f)
-            ) { Text(if (isCorrect) "Continuar" else "Acierta para continuar") }
-            Spacer(Modifier.width(8.dp))
-            OutlinedButton(onClick = onCancel, modifier = Modifier.weight(1f)) { Text("Cancelar") }
+            if (practiceMode) {
+                OutlinedButton(
+                    onClick = onCancel,
+                    modifier = Modifier.weight(1f)
+                ) { Text("Salir") }
+                Spacer(Modifier.width(8.dp))
+                Button(
+                    onClick = { state = pickRandom() },
+                    enabled = state is UiState.Showing,
+                    modifier = Modifier.weight(2f)
+                ) { Text("Otra pregunta") }
+            } else {
+                Button(
+                    onClick = onUnlock,
+                    enabled = isCorrect,
+                    modifier = Modifier.weight(2f)
+                ) { Text(if (isCorrect) "Continuar" else "Acierta para continuar") }
+                Spacer(Modifier.width(8.dp))
+                OutlinedButton(onClick = onCancel, modifier = Modifier.weight(1f)) { Text("Cancelar") }
+            }
         }
     }
 }
