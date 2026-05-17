@@ -342,32 +342,35 @@ private fun SetupScreen(modifier: Modifier = Modifier) {
                         singleLine = true
                     )
                     Row {
-                        Button(onClick = {
-                            val cleaned = glossaryUrl.trim()
-                            glossaryUrl = cleaned
-                            Prefs.setGlossaryApiUrl(context, cleaned)
-                            scope.launch {
-                                val repo = GlossaryRepository(context)
-                                var terms = repo.loadCached()
-                                if (terms.isEmpty()) {
-                                    val r = repo.refreshFromNetwork()
-                                    if (r.isFailure) {
-                                        snackbar.showSnackbar(
-                                            "Error glosario: ${r.exceptionOrNull()?.message ?: "desconocido"}"
-                                        )
+                        Button(
+                            enabled = glossaryPushEnabled,
+                            onClick = {
+                                val cleaned = glossaryUrl.trim()
+                                glossaryUrl = cleaned
+                                Prefs.setGlossaryApiUrl(context, cleaned)
+                                scope.launch {
+                                    val repo = GlossaryRepository(context)
+                                    var terms = repo.loadCached()
+                                    if (terms.isEmpty()) {
+                                        val r = repo.refreshFromNetwork()
+                                        if (r.isFailure) {
+                                            snackbar.showSnackbar(
+                                                "Error glosario: ${r.exceptionOrNull()?.message ?: "desconocido"}"
+                                            )
+                                            return@launch
+                                        }
+                                        terms = repo.loadCached()
+                                    }
+                                    if (terms.isEmpty()) {
+                                        snackbar.showSnackbar("Glosario vacío")
                                         return@launch
                                     }
-                                    terms = repo.loadCached()
+                                    val term = terms.random()
+                                    GlossaryNotifications.postTerm(context, term, lang)
+                                    snackbar.showSnackbar("Notificación enviada: ${term.symbol}")
                                 }
-                                if (terms.isEmpty()) {
-                                    snackbar.showSnackbar("Glosario vacío")
-                                    return@launch
-                                }
-                                val term = terms.random()
-                                GlossaryNotifications.postTerm(context, term, lang)
-                                snackbar.showSnackbar("Notificación enviada: ${term.symbol}")
                             }
-                        }) { Text(stringResource(R.string.glossary_push_test)) }
+                        ) { Text(stringResource(R.string.glossary_push_test)) }
                     }
                 }
             }
