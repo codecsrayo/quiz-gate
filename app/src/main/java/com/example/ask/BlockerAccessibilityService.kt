@@ -7,6 +7,23 @@ import android.os.Looper
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 
+private val TRANSIENT_PKGS = setOf(
+    "com.android.systemui",
+    "com.miui.home",
+    "com.miui.launcher",
+    "com.mi.android.globallauncher",
+    "com.google.android.apps.nexuslauncher",
+    "com.android.launcher",
+    "com.android.launcher3",
+)
+
+private fun isTransient(pkg: String): Boolean {
+    if (pkg in TRANSIENT_PKGS) return true
+    if (pkg.startsWith("com.miui.systemui")) return true
+    if (pkg.endsWith(".launcher") || pkg.endsWith(".launcher3")) return true
+    return false
+}
+
 class BlockerAccessibilityService : AccessibilityService() {
 
     @Volatile private var lastForegroundPkg: String? = null
@@ -35,16 +52,32 @@ class BlockerAccessibilityService : AccessibilityService() {
 
         val blocked = Prefs.getBlockedPackages(this)
 
-        // Leaving a blocked app: record last-seen, pause in-app timer.
+        // Leaving a blocked app:
+        //  - To transient (launcher/systemui/recents) → keep session alive (touch lastSeen)
+        //  - To any real app (own app, blocked or not) → end session immediately
         if (prev != null && prev != pkg && prev in blocked) {
-            Prefs.touchLastSeen(this, prev)
             cancelTimeout()
+            if (isTransient(pkg) || pkg == packageName) {
+                Prefs.touchLastSeen(this, prev)
+            } else {
+                Log.i(TAG, "leaving $prev → real app $pkg, ending session")
+                Prefs.clearLastSeen(this, prev)
+                Prefs.clearSessionStart(this, prev)
+            }
         }
 
         if (pkg == packageName) return
 
         if (pkg !in blocked) {
             cancelTimeout()
+            // Entered a real (non-transient, non-blocked) app: end every active
+            // blocked-app session so returning to one requires a new quiz.
+            if (!isTransient(pkg)) {
+                for (bpkg in blocked) {
+                    Prefs.clearLastSeen(this, bpkg)
+                    Prefs.clearSessionStart(this, bpkg)
+                }
+            }
             return
         }
 
@@ -123,9 +156,11 @@ class BlockerAccessibilityService : AccessibilityService() {
     }
 
     private fun isSystemPackage(pkg: String): Boolean {
+        if (pkg.endsWith(".ime")) return true
+        if (pkg == "android") return true
         if (pkg == "com.android.systemui") return true
         if (pkg.startsWith("com.miui.systemui")) return true
-        if (pkg.endsWith(".ime")) return true
+        if (pkg.startsWith("miui.systemui")) return true
         return false
     }
 
