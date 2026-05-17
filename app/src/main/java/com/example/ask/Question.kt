@@ -17,7 +17,8 @@ data class Question(
     val explanation: Map<String, String>,
     val tip: Map<String, String>,
 ) {
-    val isMultiResponse: Boolean get() = questionType == "multiple-response"
+    val isMultiResponse: Boolean
+        get() = questionType == "multiple-response" || answers.size > 1
 
     fun correctAnswers(): Set<Int> =
         if (answers.isNotEmpty()) answers.toSet() else setOf(answer)
@@ -49,7 +50,7 @@ object QuestionParser {
         id = o.optString("id"),
         domain = o.optString("domain"),
         domainLabel = stringMap(o.optJSONObject("domainLabel")),
-        questionType = o.optString("questionType", "multiple-choice"),
+        questionType = o.optString("type", o.optString("questionType", "multiple-choice")),
         scenarioBased = o.optBoolean("scenarioBased", false),
         synthetic = o.optBoolean("synthetic", false),
         q = stringMap(o.optJSONObject("q")),
