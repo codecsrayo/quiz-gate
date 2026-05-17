@@ -354,7 +354,41 @@ private fun SetupScreen(modifier: Modifier = Modifier) {
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true
                     )
-                    Button(onClick = { Prefs.setApiUrl(context, apiUrl.trim()) }) {
+                    Button(
+                        enabled = !syncing,
+                        onClick = {
+                            val cleaned = apiUrl.trim()
+                            apiUrl = cleaned
+                            Prefs.setApiUrl(context, cleaned)
+                            scope.launch {
+                                syncing = true
+                                snackbar.showSnackbar("URL guardada, sincronizando…")
+                                repo.refreshFromNetwork()
+                                    .onSuccess { n ->
+                                        cacheCount = n
+                                        lastFetch = Prefs.getLastFetch(context)
+                                        val cached = repo.loadCached()
+                                        availableDomains = cached
+                                            .groupBy { it.domain }
+                                            .map { (dom, qs) -> dom to (qs.first().domainText(lang).ifBlank { dom }) }
+                                            .sortedBy { it.second }
+                                        snackbar.showSnackbar("Sincronizadas $n preguntas")
+                                    }
+                                    .onFailure {
+                                        snackbar.showSnackbar("Error: ${it.message ?: "desconocido"}")
+                                    }
+                                syncing = false
+                            }
+                        }
+                    ) {
+                        if (syncing) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                strokeWidth = 2.dp,
+                                color = MaterialTheme.colorScheme.onPrimary
+                            )
+                            Spacer(Modifier.width(8.dp))
+                        }
                         Text(stringResource(R.string.save_settings))
                     }
                 }
