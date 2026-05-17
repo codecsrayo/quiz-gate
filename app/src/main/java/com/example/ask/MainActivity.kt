@@ -95,6 +95,7 @@ private fun SetupScreen(modifier: Modifier = Modifier) {
     var blocked by remember { mutableStateOf(Prefs.getBlockedPackages(context)) }
     var apiUrl by remember { mutableStateOf(Prefs.getApiUrl(context)) }
     var lang by remember { mutableStateOf(Prefs.getLang(context)) }
+    var maxMinutes by remember { mutableIntStateOf(Prefs.getMaxInAppMinutes(context)) }
     var cacheCount by remember { mutableIntStateOf(0) }
     var lastFetch by remember { mutableLongStateOf(Prefs.getLastFetch(context)) }
     var syncing by remember { mutableStateOf(false) }
@@ -232,6 +233,20 @@ private fun SetupScreen(modifier: Modifier = Modifier) {
 
             ElevatedCard {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(stringResource(R.string.max_in_app_title), style = MaterialTheme.typography.titleMedium)
+                    Text(stringResource(R.string.max_in_app_hint), style = MaterialTheme.typography.bodySmall)
+                    MaxMinutesSelector(
+                        value = maxMinutes,
+                        onChange = {
+                            maxMinutes = it
+                            Prefs.setMaxInAppMinutes(context, it)
+                        },
+                    )
+                }
+            }
+
+            ElevatedCard {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(stringResource(R.string.api_url_title), style = MaterialTheme.typography.titleMedium)
                     OutlinedTextField(
                         value = apiUrl,
@@ -327,6 +342,23 @@ private fun PermissionRow(
             TextButton(onClick = action) { Text(stringResource(R.string.perm_change)) }
         } else {
             Button(onClick = action) { Text(stringResource(R.string.perm_grant)) }
+        }
+    }
+}
+
+private val MAX_MINUTES_OPTIONS = listOf(0, 5, 10, 20, 30, 60)
+
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@Composable
+private fun MaxMinutesSelector(value: Int, onChange: (Int) -> Unit) {
+    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+        MAX_MINUTES_OPTIONS.forEachIndexed { idx, minutes ->
+            SegmentedButton(
+                selected = minutes == value,
+                onClick = { onChange(minutes) },
+                shape = SegmentedButtonDefaults.itemShape(idx, MAX_MINUTES_OPTIONS.size),
+                label = { Text(if (minutes == 0) "∞" else "$minutes") }
+            )
         }
     }
 }

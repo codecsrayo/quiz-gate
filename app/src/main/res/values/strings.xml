@@ -33,4 +33,7 @@
     <string name="blocked_apps_title">Apps bloqueadas</string>
     <string name="api_url_title">URL de la API</string>
     <string name="save_settings">Guardar</string>
+    <string name="max_in_app_title">Tiempo máximo en la app</string>
+    <string name="max_in_app_hint">Minutos antes de volver a preguntar.</string>
+    <string name="max_in_app_label">Minutos</string>
 </resources>

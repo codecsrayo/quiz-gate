@@ -13,12 +13,15 @@ object Prefs {
     private const val KEY_LAST_BLOCKED_PKG = "last_blocked_package"
     private const val KEY_LAST_FETCH_MS = "last_fetch_ms"
     private const val KEY_LANG = "lang"
+    private const val KEY_MAX_IN_APP_MIN = "max_in_app_min"
 
     const val DEFAULT_API_URL = "https://codecsrayo.com/api/quiz/practitioner"
     const val DEFAULT_LANG = "es"
+    const val DEFAULT_MAX_IN_APP_MIN = 10
     private const val PENDING_UNLOCK_TTL_MS = 60_000L
     private const val SESSION_WINDOW_MS = 5 * 60_000L
     private const val KEY_LAST_SEEN_PREFIX = "last_seen_"
+    private const val KEY_SESSION_START_PREFIX = "session_start_"
 
     val DEFAULT_BLOCKED: Set<String> = setOf(
         "com.facebook.katana",
@@ -104,5 +107,26 @@ object Prefs {
 
     fun clearLastSeen(ctx: Context, pkg: String) {
         sp(ctx).edit().remove("$KEY_LAST_SEEN_PREFIX$pkg").apply()
+    }
+
+    fun getMaxInAppMinutes(ctx: Context): Int =
+        sp(ctx).getInt(KEY_MAX_IN_APP_MIN, DEFAULT_MAX_IN_APP_MIN)
+
+    fun setMaxInAppMinutes(ctx: Context, minutes: Int) {
+        sp(ctx).edit().putInt(KEY_MAX_IN_APP_MIN, minutes.coerceAtLeast(0)).apply()
+    }
+
+    fun getMaxInAppMs(ctx: Context): Long =
+        getMaxInAppMinutes(ctx).toLong() * 60_000L
+
+    fun getSessionStart(ctx: Context, pkg: String): Long =
+        sp(ctx).getLong("$KEY_SESSION_START_PREFIX$pkg", 0L)
+
+    fun setSessionStart(ctx: Context, pkg: String, ms: Long) {
+        sp(ctx).edit().putLong("$KEY_SESSION_START_PREFIX$pkg", ms).apply()
+    }
+
+    fun clearSessionStart(ctx: Context, pkg: String) {
+        sp(ctx).edit().remove("$KEY_SESSION_START_PREFIX$pkg").apply()
     }
 }
