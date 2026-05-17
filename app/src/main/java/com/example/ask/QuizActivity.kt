@@ -175,13 +175,21 @@ private fun QuizGateScreen(
             Text("Quiz Gate", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
             FilterChip(
                 selected = lang == "es",
-                onClick = { lang = "es"; Prefs.setLang(context, "es") },
+                onClick = {
+                    Log.i("QuizGate", "Lang chip tap -> es (was=$lang)")
+                    lang = "es"
+                    Prefs.setLang(context, "es")
+                },
                 label = { Text("ES") }
             )
             Spacer(Modifier.width(8.dp))
             FilterChip(
                 selected = lang == "en",
-                onClick = { lang = "en"; Prefs.setLang(context, "en") },
+                onClick = {
+                    Log.i("QuizGate", "Lang chip tap -> en (was=$lang)")
+                    lang = "en"
+                    Prefs.setLang(context, "en")
+                },
                 label = { Text("EN") }
             )
         }
@@ -276,6 +284,8 @@ private fun QuestionView(
 ) {
     val q = state.question
     val correct = q.correctAnswers()
+    val stmt = q.statement(lang)
+    Log.i("QuizGate", "QuestionView render id=${q.id} lang=$lang qKeys=${q.q.keys} stmtPreview='${stmt.take(40)}'")
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -294,7 +304,7 @@ private fun QuestionView(
             )
         }
 
-        Text(q.statement(lang), style = MaterialTheme.typography.titleMedium)
+        Text(stmt, style = MaterialTheme.typography.titleMedium)
 
         val (successBg, successFg) = successColors()
         val (errorBg, errorFg) = errorColors()
