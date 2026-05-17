@@ -120,9 +120,20 @@ private fun QuizGateScreen(
         if (pool.isEmpty()) {
             return UiState.Error("No hay preguntas en caché. Abre la app principal y pulsa 'Sincronizar'.")
         }
-        val enabledDomains = Prefs.getEnabledDomains(context)
-        val byDomain = if (enabledDomains.isEmpty()) pool
-            else pool.filter { it.domain in enabledDomains }
+        val includeOfficial = Prefs.isIncludeOfficial(context)
+        val includeSynthetic = Prefs.isIncludeSynthetic(context)
+        if (!includeOfficial && !includeSynthetic) {
+            return UiState.Error("Marca al menos una fuente (oficiales o sintéticas) en Home.")
+        }
+        val bySource = pool.filter { q ->
+            (q.synthetic && includeSynthetic) || (!q.synthetic && includeOfficial)
+        }
+        if (bySource.isEmpty()) {
+            return UiState.Error("No hay preguntas para la fuente seleccionada. Ajusta el filtro en Home.")
+        }
+        val enabledDomains = Prefs.getEnabledDomainsOrNull(context)
+        val byDomain = if (enabledDomains == null) bySource
+            else bySource.filter { it.domain in enabledDomains }
         if (byDomain.isEmpty()) {
             return UiState.Error("Ningún dominio seleccionado tiene preguntas. Ajusta el filtro.")
         }

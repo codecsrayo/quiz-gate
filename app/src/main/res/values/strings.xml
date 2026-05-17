@@ -51,7 +51,12 @@
     <string name="max_in_app_hint">Minutos antes de volver a preguntar.</string>
     <string name="max_in_app_label">Minutos</string>
     <string name="domain_filter_title">Dominios incluidos</string>
-    <string name="domain_filter_hint">Sin selección = todos.</string>
+    <string name="home_filters_title">Filtros del quiz</string>
+    <string name="home_filters_hint">Aplica tanto al modo práctica como al bloqueo automático.</string>
+    <string name="home_source_official">Oficiales</string>
+    <string name="home_source_synthetic">Sintéticas</string>
+    <string name="home_filtered_count">Disponibles según filtros: %1$d</string>
+    <string name="home_no_sources">Marca al menos una fuente.</string>
 
     <string name="glossary_push_title">Glosario AWS por notificación</string>
     <string name="glossary_push_hint">Recibe un término del glosario cada cierto tiempo.</string>

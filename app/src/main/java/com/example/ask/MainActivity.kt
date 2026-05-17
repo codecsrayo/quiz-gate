@@ -98,8 +98,12 @@ private fun HomeScreen(onStartQuiz: () -> Unit, onOpenConfig: () -> Unit) {
     val repo = remember { QuizRepository(context) }
     val scope = rememberCoroutineScope()
 
-    var realCount by remember { mutableIntStateOf(0) }
-    var syntheticCount by remember { mutableIntStateOf(0) }
+    var pool by remember { mutableStateOf<List<Question>>(emptyList()) }
+    var availableDomains by remember { mutableStateOf<List<Pair<String, String>>>(emptyList()) }
+    var enabledDomains by remember { mutableStateOf<Set<String>?>(Prefs.getEnabledDomainsOrNull(context)) }
+    var includeOfficial by remember { mutableStateOf(Prefs.isIncludeOfficial(context)) }
+    var includeSynthetic by remember { mutableStateOf(Prefs.isIncludeSynthetic(context)) }
+    var lang by remember { mutableStateOf(Prefs.getLang(context)) }
     var perms by remember {
         mutableStateOf(
             PermStatus(
@@ -110,10 +114,17 @@ private fun HomeScreen(onStartQuiz: () -> Unit, onOpenConfig: () -> Unit) {
         )
     }
 
+    fun refreshDomains(cached: List<Question>) {
+        availableDomains = cached
+            .groupBy { it.domain }
+            .map { (dom, qs) -> dom to (qs.first().domainText(lang).ifBlank { dom }) }
+            .sortedBy { it.second }
+    }
+
     LaunchedEffect(Unit) {
         val cached = repo.loadCached()
-        realCount = cached.count { !it.synthetic }
-        syntheticCount = cached.count { it.synthetic }
+        pool = cached
+        refreshDomains(cached)
     }
 
     DisposableEffect(lifecycleOwner) {
@@ -124,10 +135,14 @@ private fun HomeScreen(onStartQuiz: () -> Unit, onOpenConfig: () -> Unit) {
                     overlay = Permissions.canDrawOverlays(context),
                     battery = Permissions.isIgnoringBatteryOptimizations(context),
                 )
+                lang = Prefs.getLang(context)
+                enabledDomains = Prefs.getEnabledDomainsOrNull(context)
+                includeOfficial = Prefs.isIncludeOfficial(context)
+                includeSynthetic = Prefs.isIncludeSynthetic(context)
                 scope.launch {
                     val cached = repo.loadCached()
-                    realCount = cached.count { !it.synthetic }
-                    syntheticCount = cached.count { it.synthetic }
+                    pool = cached
+                    refreshDomains(cached)
                 }
             }
         }
@@ -135,22 +150,21 @@ private fun HomeScreen(onStartQuiz: () -> Unit, onOpenConfig: () -> Unit) {
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
+    val realCount = pool.count { !it.synthetic }
+    val syntheticCount = pool.count { it.synthetic }
     val totalQuestions = realCount + syntheticCount
-    val canStart = totalQuestions > 0
+    val filteredCount = pool.count { q ->
+        val sourceOk = (q.synthetic && includeSynthetic) || (!q.synthetic && includeOfficial)
+        val domainOk = enabledDomains?.contains(q.domain) ?: true
+        sourceOk && domainOk
+    }
+    val canStart = filteredCount > 0 && (includeOfficial || includeSynthetic)
     val permsOk = perms.accessibility && perms.overlay && perms.battery
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.app_name)) },
-                actions = {
-                    IconButton(onClick = onOpenConfig) {
-                        Icon(
-                            Icons.Filled.Settings,
-                            contentDescription = stringResource(R.string.config_title),
-                        )
-                    }
-                }
             )
         }
     ) { padding ->
@@ -158,39 +172,94 @@ private fun HomeScreen(onStartQuiz: () -> Unit, onOpenConfig: () -> Unit) {
             modifier = Modifier
                 .padding(padding)
                 .fillMaxSize()
+                .verticalScroll(rememberScrollState())
                 .padding(24.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Spacer(Modifier.weight(0.3f))
-
-            Text(
-                text = stringResource(R.string.home_tagline),
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.SemiBold,
-            )
-            Text(
-                text = stringResource(R.string.home_subtitle),
-                style = MaterialTheme.typography.bodyMedium,
-            )
+            if (!permsOk) {
+                ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        text = stringResource(R.string.home_perms_warning),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color(0xFFC62828),
+                        modifier = Modifier.padding(16.dp),
+                    )
+                }
+            }
 
             ElevatedCard(modifier = Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
-                        text = stringResource(R.string.home_bank_count, totalQuestions),
-                        style = MaterialTheme.typography.titleSmall,
+                        stringResource(R.string.home_filters_title),
+                        style = MaterialTheme.typography.titleMedium,
                     )
                     Text(
-                        text = stringResource(R.string.home_bank_breakdown, realCount, syntheticCount),
+                        stringResource(R.string.home_filters_hint),
                         style = MaterialTheme.typography.bodySmall,
                     )
-                    if (!permsOk) {
-                        Spacer(Modifier.height(4.dp))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Checkbox(
+                            checked = includeOfficial,
+                            onCheckedChange = { checked ->
+                                includeOfficial = checked
+                                Prefs.setIncludeOfficial(context, checked)
+                            },
+                        )
                         Text(
-                            text = stringResource(R.string.home_perms_warning),
+                            text = stringResource(R.string.home_source_official) +
+                                " (" + realCount + ")",
+                        )
+                    }
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Checkbox(
+                            checked = includeSynthetic,
+                            onCheckedChange = { checked ->
+                                includeSynthetic = checked
+                                Prefs.setIncludeSynthetic(context, checked)
+                            },
+                        )
+                        Text(
+                            text = stringResource(R.string.home_source_synthetic) +
+                                " (" + syntheticCount + ")",
+                        )
+                    }
+                    if (!includeOfficial && !includeSynthetic) {
+                        Text(
+                            text = stringResource(R.string.home_no_sources),
                             style = MaterialTheme.typography.bodySmall,
                             color = Color(0xFFC62828),
                         )
+                    }
+                    if (availableDomains.isNotEmpty()) {
+                        Text(
+                            stringResource(R.string.domain_filter_title),
+                            style = MaterialTheme.typography.titleSmall,
+                        )
+                        val allKeys = availableDomains.map { it.first }.toSet()
+                        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            availableDomains.forEach { (key, label) ->
+                                val current = enabledDomains ?: allKeys
+                                val selected = key in current
+                                FilterChip(
+                                    selected = selected,
+                                    onClick = {
+                                        val next = current.toMutableSet().apply {
+                                            if (selected) remove(key) else add(key)
+                                        }
+                                        enabledDomains = next
+                                        Prefs.setEnabledDomains(context, next)
+                                    },
+                                    label = { Text(label) },
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -224,8 +293,6 @@ private fun HomeScreen(onStartQuiz: () -> Unit, onOpenConfig: () -> Unit) {
                 Spacer(Modifier.width(8.dp))
                 Text(stringResource(R.string.home_open_config))
             }
-
-            Spacer(Modifier.weight(1f))
         }
     }
 }
@@ -291,8 +358,6 @@ private fun SetupScreen(modifier: Modifier = Modifier) {
     var glossaryInterval by remember { mutableIntStateOf(Prefs.getGlossaryPushIntervalMin(context)) }
     var lang by remember { mutableStateOf(Prefs.getLang(context)) }
     var maxMinutes by remember { mutableIntStateOf(Prefs.getMaxInAppMinutes(context)) }
-    var availableDomains by remember { mutableStateOf<List<Pair<String, String>>>(emptyList()) }
-    var enabledDomains by remember { mutableStateOf(Prefs.getEnabledDomains(context)) }
     var realCount by remember { mutableIntStateOf(0) }
     var syntheticCount by remember { mutableIntStateOf(0) }
     var lastFetch by remember { mutableLongStateOf(Prefs.getLastFetch(context)) }
@@ -302,10 +367,6 @@ private fun SetupScreen(modifier: Modifier = Modifier) {
         val cached = repo.loadCached()
         realCount = cached.count { !it.synthetic }
         syntheticCount = cached.count { it.synthetic }
-        availableDomains = cached
-            .groupBy { it.domain }
-            .map { (dom, qs) -> dom to (qs.first().domainText(lang).ifBlank { dom }) }
-            .sortedBy { it.second }
     }
 
     DisposableEffect(lifecycleOwner) {
@@ -381,10 +442,6 @@ private fun SetupScreen(modifier: Modifier = Modifier) {
                                         val cached = repo.loadCached()
                                         realCount = cached.count { !it.synthetic }
                                         syntheticCount = cached.count { it.synthetic }
-                                        availableDomains = cached
-                                            .groupBy { it.domain }
-                                            .map { (dom, qs) -> dom to (qs.first().domainText(lang).ifBlank { dom }) }
-                                            .sortedBy { it.second }
                                         snackbar.showSnackbar(
                                             "Sincronizadas $n (oficiales=$realCount · sintéticas=$syntheticCount)"
                                         )
@@ -455,31 +512,6 @@ private fun SetupScreen(modifier: Modifier = Modifier) {
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
-                        }
-                    }
-                }
-            }
-
-            if (availableDomains.isNotEmpty()) {
-                ElevatedCard {
-                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text(stringResource(R.string.domain_filter_title), style = MaterialTheme.typography.titleMedium)
-                        Text(stringResource(R.string.domain_filter_hint), style = MaterialTheme.typography.bodySmall)
-                        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            availableDomains.forEach { (key, label) ->
-                                val selected = key in enabledDomains
-                                FilterChip(
-                                    selected = selected,
-                                    onClick = {
-                                        val next = enabledDomains.toMutableSet().apply {
-                                            if (selected) remove(key) else add(key)
-                                        }
-                                        enabledDomains = next
-                                        Prefs.setEnabledDomains(context, next)
-                                    },
-                                    label = { Text(label) }
-                                )
-                            }
                         }
                     }
                 }

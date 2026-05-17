@@ -17,6 +17,8 @@ object Prefs {
     private const val KEY_LANG = "lang"
     private const val KEY_MAX_IN_APP_MIN = "max_in_app_min"
     private const val KEY_ENABLED_DOMAINS = "enabled_domains"
+    private const val KEY_INCLUDE_OFFICIAL = "include_official"
+    private const val KEY_INCLUDE_SYNTHETIC = "include_synthetic"
     private const val KEY_RECENT_QUESTION_IDS = "recent_question_ids"
     private const val KEY_QUESTION_STATS = "question_stats"
     private const val KEY_LAST_GLOSSARY_FETCH_MS = "last_glossary_fetch_ms"
@@ -183,12 +185,28 @@ object Prefs {
         sp(ctx).edit().remove("$KEY_SESSION_START_PREFIX$pkg").apply()
     }
 
-    /** Empty set means "all domains enabled". */
-    fun getEnabledDomains(ctx: Context): Set<String> =
-        sp(ctx).getStringSet(KEY_ENABLED_DOMAINS, emptySet()) ?: emptySet()
+    /** Null means "treat as all enabled" (never configured or empty selection). */
+    fun getEnabledDomainsOrNull(ctx: Context): Set<String>? {
+        val set = sp(ctx).getStringSet(KEY_ENABLED_DOMAINS, null) ?: return null
+        return set.ifEmpty { null }
+    }
 
     fun setEnabledDomains(ctx: Context, domains: Set<String>) {
         sp(ctx).edit().putStringSet(KEY_ENABLED_DOMAINS, domains).apply()
+    }
+
+    fun isIncludeOfficial(ctx: Context): Boolean =
+        sp(ctx).getBoolean(KEY_INCLUDE_OFFICIAL, true)
+
+    fun setIncludeOfficial(ctx: Context, included: Boolean) {
+        sp(ctx).edit().putBoolean(KEY_INCLUDE_OFFICIAL, included).apply()
+    }
+
+    fun isIncludeSynthetic(ctx: Context): Boolean =
+        sp(ctx).getBoolean(KEY_INCLUDE_SYNTHETIC, true)
+
+    fun setIncludeSynthetic(ctx: Context, included: Boolean) {
+        sp(ctx).edit().putBoolean(KEY_INCLUDE_SYNTHETIC, included).apply()
     }
 
     fun getRecentQuestionIds(ctx: Context): List<String> {
