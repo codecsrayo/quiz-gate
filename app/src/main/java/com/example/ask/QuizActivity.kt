@@ -113,9 +113,22 @@ private fun QuizGateScreen(onUnlock: () -> Unit, onCancel: () -> Unit) {
         val recent = Prefs.getRecentQuestionIds(context).toSet()
         val candidates = byDomain.filterNot { it.id in recent }
             .ifEmpty { byDomain }
-        val chosen = candidates.random()
+        val stats = Prefs.getStats(context)
+        fun weight(q: Question): Int {
+            val s = stats[q.id]
+            val wrong = s?.wrong ?: 0
+            val correct = s?.correct ?: 0
+            return (1 + 2 * wrong - correct).coerceAtLeast(1)
+        }
+        val totalWeight = candidates.sumOf { weight(it).toLong() }
+        var pick = (0 until totalWeight).random()
+        val chosen = candidates.first {
+            pick -= weight(it).toLong()
+            pick < 0L
+        }
         val maxRecent = (pool.size / 2).coerceIn(5, 30)
         Prefs.pushRecentQuestionId(context, chosen.id, maxRecent)
+        Prefs.recordShown(context, chosen.id)
         return UiState.Showing(chosen, selected = emptySet(), checked = false)
     }
 
@@ -198,7 +211,11 @@ private fun QuizGateScreen(onUnlock: () -> Unit, onCancel: () -> Unit) {
                         }
                         state = s.copy(selected = next)
                     },
-                    onCheck = { state = s.copy(checked = true) },
+                    onCheck = {
+                        val correct = s.selected == s.question.correctAnswers()
+                        Prefs.recordAnswer(context, s.question.id, correct)
+                        state = s.copy(checked = true)
+                    },
                     onNext = { state = pickRandom() },
                 )
             }

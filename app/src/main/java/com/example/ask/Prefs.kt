@@ -2,6 +2,7 @@ package com.example.ask
 
 import android.content.Context
 import android.content.SharedPreferences
+import org.json.JSONObject
 
 object Prefs {
     private const val FILE = "quizgate_prefs"
@@ -16,6 +17,7 @@ object Prefs {
     private const val KEY_MAX_IN_APP_MIN = "max_in_app_min"
     private const val KEY_ENABLED_DOMAINS = "enabled_domains"
     private const val KEY_RECENT_QUESTION_IDS = "recent_question_ids"
+    private const val KEY_QUESTION_STATS = "question_stats"
 
     const val DEFAULT_API_URL = "https://codecsrayo.com/api/quiz/practitioner"
     const val DEFAULT_LANG = "es"
@@ -152,5 +154,44 @@ object Prefs {
         current.add(id)
         while (current.size > maxSize) current.removeAt(0)
         sp(ctx).edit().putString(KEY_RECENT_QUESTION_IDS, current.joinToString("|")).apply()
+    }
+
+    data class QStat(val shown: Int, val correct: Int, val wrong: Int)
+
+    fun getStats(ctx: Context): Map<String, QStat> {
+        val raw = sp(ctx).getString(KEY_QUESTION_STATS, null) ?: return emptyMap()
+        return runCatching {
+            val obj = JSONObject(raw)
+            val out = HashMap<String, QStat>(obj.length())
+            val it = obj.keys()
+            while (it.hasNext()) {
+                val k = it.next()
+                val v = obj.optJSONObject(k) ?: continue
+                out[k] = QStat(v.optInt("s", 0), v.optInt("c", 0), v.optInt("w", 0))
+            }
+            out
+        }.getOrDefault(emptyMap())
+    }
+
+    private fun saveStats(ctx: Context, stats: Map<String, QStat>) {
+        val obj = JSONObject()
+        for ((k, v) in stats) {
+            obj.put(k, JSONObject().put("s", v.shown).put("c", v.correct).put("w", v.wrong))
+        }
+        sp(ctx).edit().putString(KEY_QUESTION_STATS, obj.toString()).apply()
+    }
+
+    fun recordShown(ctx: Context, id: String) {
+        val stats = getStats(ctx).toMutableMap()
+        val s = stats[id] ?: QStat(0, 0, 0)
+        stats[id] = s.copy(shown = s.shown + 1)
+        saveStats(ctx, stats)
+    }
+
+    fun recordAnswer(ctx: Context, id: String, correct: Boolean) {
+        val stats = getStats(ctx).toMutableMap()
+        val s = stats[id] ?: QStat(0, 0, 0)
+        stats[id] = if (correct) s.copy(correct = s.correct + 1) else s.copy(wrong = s.wrong + 1)
+        saveStats(ctx, stats)
     }
 }
