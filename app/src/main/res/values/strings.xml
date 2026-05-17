@@ -1,0 +1,36 @@
+<resources>
+    <string name="app_name">Quiz Gate</string>
+    <string name="accessibility_service_label">Quiz Gate Blocker</string>
+    <string name="accessibility_service_description">Detecta cuando abres Facebook, WhatsApp o Instagram y te muestra una pregunta del quiz antes de dejarte continuar.</string>
+
+    <string name="setup_title">Quiz Gate</string>
+    <string name="setup_intro">Antes de abrir Facebook, WhatsApp o Instagram, esta app te obliga a acertar una pregunta del quiz.</string>
+    <string name="open_accessibility_settings">Abrir configuración de Accesibilidad</string>
+    <string name="accessibility_enabled">Servicio de Accesibilidad: activado</string>
+    <string name="accessibility_disabled">Servicio de Accesibilidad: desactivado</string>
+
+    <string name="permissions_title">Permisos requeridos</string>
+    <string name="permissions_pending">Faltan permisos</string>
+    <string name="perm_accessibility">Servicio de Accesibilidad</string>
+    <string name="perm_accessibility_hint">Para detectar cuando abres una app bloqueada.</string>
+    <string name="perm_overlay">Mostrar sobre otras apps</string>
+    <string name="perm_overlay_hint">Permite que el quiz aparezca encima de WhatsApp/Facebook/Instagram.</string>
+    <string name="perm_battery">Sin optimización de batería</string>
+    <string name="perm_battery_hint">Evita que HyperOS/Android maten el servicio en segundo plano.</string>
+    <string name="perm_open_miui_autostart">Abrir Auto-inicio (MIUI/HyperOS)</string>
+    <string name="perm_open_miui_other">Abrir Otros permisos (MIUI/HyperOS)</string>
+    <string name="perm_open_miui_other_hint">Activa “Mostrar ventanas emergentes en segundo plano” y “Mostrar en pantalla de bloqueo”.</string>
+    <string name="perm_grant">Conceder</string>
+    <string name="perm_change">Cambiar</string>
+
+    <string name="questions_cache_title">Banco de preguntas</string>
+    <string name="questions_cached_count">Preguntas en caché: %1$d</string>
+    <string name="never_synced">Aún no se ha sincronizado.</string>
+    <string name="last_sync">Última sincronización: %1$s</string>
+    <string name="sync_now">Sincronizar ahora</string>
+    <string name="language_title">Idioma</string>
+
+    <string name="blocked_apps_title">Apps bloqueadas</string>
+    <string name="api_url_title">URL de la API</string>
+    <string name="save_settings">Guardar</string>
+</resources>

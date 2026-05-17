@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <style name="Theme.Ask" parent="android:Theme.Material.Light.NoActionBar" />
+
+    <style name="Theme.Ask.Fullscreen" parent="android:Theme.Material.Light.NoActionBar.Fullscreen">
+        <item name="android:windowFullscreen">true</item>
+        <item name="android:windowContentOverlay">@null</item>
+    </style>
+</resources>
