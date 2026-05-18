@@ -1,11 +1,13 @@
 package com.codecsrayo.quizgate
 
 import android.content.Context
+import android.util.Log
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
+import java.util.Calendar
 import java.util.concurrent.TimeUnit
 
 class GlossaryPushWorker(
@@ -15,6 +17,19 @@ class GlossaryPushWorker(
 
     override suspend fun doWork(): Result {
         val ctx = applicationContext
+
+        // Bail before any network or notification work when we're outside the
+        // user-configured active window. Return success so WorkManager keeps
+        // the periodic schedule alive — the next firing will recheck.
+        val cal = Calendar.getInstance()
+        val nowMin = cal.get(Calendar.HOUR_OF_DAY) * 60 + cal.get(Calendar.MINUTE)
+        val startMin = Prefs.getGlossaryActiveStartMin(ctx)
+        val endMin = Prefs.getGlossaryActiveEndMin(ctx)
+        if (!NotificationWindow.isActive(nowMin, startMin, endMin)) {
+            Log.i("GlossaryWorker", "Skipping push at minute=$nowMin (window $startMin..$endMin)")
+            return Result.success()
+        }
+
         val repo = GlossaryRepository(ctx)
 
         var terms = repo.loadCached()

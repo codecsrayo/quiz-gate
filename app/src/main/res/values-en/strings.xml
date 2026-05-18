@@ -35,6 +35,10 @@
     <string name="perm_change">Change</string>
     <string name="perm_grant_next">Grant next permission (%1$d left)</string>
     <string name="perm_all_granted">All permissions are set.</string>
+    <string name="glossary_active_window_title">Active hours</string>
+    <string name="glossary_active_window_hint">Glossary notifications are only delivered inside this window. Set start equal to end to disable the restriction.</string>
+    <string name="glossary_active_from">From</string>
+    <string name="glossary_active_to">To</string>
 
     <string name="questions_cache_title">Question bank</string>
     <string name="questions_official_title">Official questions (practitioner)</string>

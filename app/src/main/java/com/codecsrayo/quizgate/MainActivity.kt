@@ -399,6 +399,8 @@ private fun SetupScreen(
     var glossaryUrl by remember { mutableStateOf(Prefs.getGlossaryApiUrl(context)) }
     var glossaryPushEnabled by remember { mutableStateOf(Prefs.isGlossaryPushEnabled(context)) }
     var glossaryInterval by remember { mutableIntStateOf(Prefs.getGlossaryPushIntervalMin(context)) }
+    var glossaryActiveStart by remember { mutableIntStateOf(Prefs.getGlossaryActiveStartMin(context)) }
+    var glossaryActiveEnd by remember { mutableIntStateOf(Prefs.getGlossaryActiveEndMin(context)) }
     var maxMinutes by remember { mutableIntStateOf(Prefs.getMaxInAppMinutes(context)) }
     var realCount by remember { mutableIntStateOf(0) }
     var syntheticCount by remember { mutableIntStateOf(0) }
@@ -612,6 +614,26 @@ private fun SetupScreen(
                             if (glossaryPushEnabled) GlossaryPushWorker.applyFromPrefs(context)
                         }
                     )
+                    Text(
+                        stringResource(R.string.glossary_active_window_title),
+                        style = MaterialTheme.typography.titleSmall,
+                    )
+                    Text(
+                        stringResource(R.string.glossary_active_window_hint),
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                    ActiveWindowRow(
+                        startMin = glossaryActiveStart,
+                        endMin = glossaryActiveEnd,
+                        onStartChange = { min ->
+                            glossaryActiveStart = min
+                            Prefs.setGlossaryActiveStartMin(context, min)
+                        },
+                        onEndChange = { min ->
+                            glossaryActiveEnd = min
+                            Prefs.setGlossaryActiveEndMin(context, min)
+                        },
+                    )
                     Text(stringResource(R.string.glossary_url_title), style = MaterialTheme.typography.titleSmall)
                     OutlinedTextField(
                         value = glossaryUrl,
@@ -772,6 +794,91 @@ private fun PermissionRow(
 
 private val MAX_MINUTES_OPTIONS = listOf(0, 5, 10, 20, 30, 60)
 private val GLOSSARY_INTERVAL_OPTIONS = listOf(15, 30, 60, 180, 360)
+
+private fun formatHhMm(min: Int): String {
+    val safe = min.coerceIn(0, 1440)
+    val h = (safe / 60).coerceAtMost(23)
+    val m = safe % 60
+    return "%02d:%02d".format(h, m)
+}
+
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@Composable
+private fun ActiveWindowRow(
+    startMin: Int,
+    endMin: Int,
+    onStartChange: (Int) -> Unit,
+    onEndChange: (Int) -> Unit,
+) {
+    var editing by remember { mutableStateOf<EditingWhich?>(null) }
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        OutlinedButton(
+            modifier = Modifier.weight(1f),
+            onClick = { editing = EditingWhich.Start },
+        ) {
+            Text(stringResource(R.string.glossary_active_from) + ": " + formatHhMm(startMin))
+        }
+        OutlinedButton(
+            modifier = Modifier.weight(1f),
+            onClick = { editing = EditingWhich.End },
+        ) {
+            Text(stringResource(R.string.glossary_active_to) + ": " + formatHhMm(endMin))
+        }
+    }
+
+    when (editing) {
+        EditingWhich.Start -> HourMinutePickerDialog(
+            initialMinutes = startMin,
+            onDismiss = { editing = null },
+            onConfirm = {
+                onStartChange(it)
+                editing = null
+            },
+        )
+        EditingWhich.End -> HourMinutePickerDialog(
+            initialMinutes = endMin,
+            onDismiss = { editing = null },
+            onConfirm = {
+                onEndChange(it)
+                editing = null
+            },
+        )
+        null -> Unit
+    }
+}
+
+private enum class EditingWhich { Start, End }
+
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@Composable
+private fun HourMinutePickerDialog(
+    initialMinutes: Int,
+    onDismiss: () -> Unit,
+    onConfirm: (Int) -> Unit,
+) {
+    val state = rememberTimePickerState(
+        initialHour = (initialMinutes / 60).coerceIn(0, 23),
+        initialMinute = (initialMinutes % 60).coerceIn(0, 59),
+        is24Hour = true,
+    )
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            TextButton(onClick = { onConfirm(state.hour * 60 + state.minute) }) {
+                Text(stringResource(android.R.string.ok))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(android.R.string.cancel))
+            }
+        },
+        text = { TimePicker(state = state) },
+    )
+}
 
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable

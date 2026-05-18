@@ -16,6 +16,8 @@ object Prefs {
     const val DEFAULT_API_URL = "https://codecsrayo.com/api/quiz/practitioner/questions"
     const val DEFAULT_GLOSSARY_API_URL = "https://codecsrayo.com/api/quiz/practitioner/glossary"
     const val DEFAULT_GLOSSARY_PUSH_INTERVAL_MIN = 60
+    const val DEFAULT_GLOSSARY_ACTIVE_START_MIN = 8 * 60   // 08:00
+    const val DEFAULT_GLOSSARY_ACTIVE_END_MIN = 22 * 60    // 22:00
     const val DEFAULT_LANG = "es"
     const val DEFAULT_MAX_IN_APP_MIN = 10
 
@@ -93,6 +95,12 @@ object Prefs {
     fun getGlossaryPushIntervalMin(ctx: Context?): Int = b(ctx).getGlossaryPushIntervalMin()
     fun setGlossaryPushIntervalMin(ctx: Context?, minutes: Int) =
         b(ctx).setGlossaryPushIntervalMin(minutes)
+
+    fun getGlossaryActiveStartMin(ctx: Context?): Int = b(ctx).getGlossaryActiveStartMin()
+    fun setGlossaryActiveStartMin(ctx: Context?, min: Int) = b(ctx).setGlossaryActiveStartMin(min)
+
+    fun getGlossaryActiveEndMin(ctx: Context?): Int = b(ctx).getGlossaryActiveEndMin()
+    fun setGlossaryActiveEndMin(ctx: Context?, min: Int) = b(ctx).setGlossaryActiveEndMin(min)
 
     fun getRecentGlossaryIds(ctx: Context?): List<String> = b(ctx).getRecentGlossaryIds()
     fun pushRecentGlossaryId(ctx: Context?, id: String, maxSize: Int) =

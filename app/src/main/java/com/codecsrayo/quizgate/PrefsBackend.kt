@@ -44,6 +44,14 @@ interface PrefsBackend {
     fun getGlossaryPushIntervalMin(): Int
     fun setGlossaryPushIntervalMin(minutes: Int)
 
+    /** Minute-of-day [0, 1440] when the glossary-push active window opens. */
+    fun getGlossaryActiveStartMin(): Int
+    fun setGlossaryActiveStartMin(min: Int)
+
+    /** Minute-of-day [0, 1440] when the glossary-push active window closes (exclusive). */
+    fun getGlossaryActiveEndMin(): Int
+    fun setGlossaryActiveEndMin(min: Int)
+
     fun getRecentGlossaryIds(): List<String>
     fun pushRecentGlossaryId(id: String, maxSize: Int)
 
@@ -168,6 +176,18 @@ internal class DefaultPrefsBackend(context: Context) : PrefsBackend {
         sp.edit().putInt(KEY_GLOSSARY_PUSH_INTERVAL_MIN, minutes.coerceAtLeast(15)).apply()
     }
 
+    override fun getGlossaryActiveStartMin(): Int =
+        sp.getInt(KEY_GLOSSARY_ACTIVE_START_MIN, Prefs.DEFAULT_GLOSSARY_ACTIVE_START_MIN)
+    override fun setGlossaryActiveStartMin(min: Int) {
+        sp.edit().putInt(KEY_GLOSSARY_ACTIVE_START_MIN, min.coerceIn(0, 1440)).apply()
+    }
+
+    override fun getGlossaryActiveEndMin(): Int =
+        sp.getInt(KEY_GLOSSARY_ACTIVE_END_MIN, Prefs.DEFAULT_GLOSSARY_ACTIVE_END_MIN)
+    override fun setGlossaryActiveEndMin(min: Int) {
+        sp.edit().putInt(KEY_GLOSSARY_ACTIVE_END_MIN, min.coerceIn(0, 1440)).apply()
+    }
+
     override fun getRecentGlossaryIds(): List<String> =
         RecentQueue.decode(sp.getString(KEY_RECENT_GLOSSARY_IDS, null))
     override fun pushRecentGlossaryId(id: String, maxSize: Int) {
@@ -286,6 +306,8 @@ internal class DefaultPrefsBackend(context: Context) : PrefsBackend {
         const val KEY_LAST_GLOSSARY_FETCH_MS = "last_glossary_fetch_ms"
         const val KEY_GLOSSARY_PUSH_ENABLED = "glossary_push_enabled"
         const val KEY_GLOSSARY_PUSH_INTERVAL_MIN = "glossary_push_interval_min"
+        const val KEY_GLOSSARY_ACTIVE_START_MIN = "glossary_active_start_min"
+        const val KEY_GLOSSARY_ACTIVE_END_MIN = "glossary_active_end_min"
         const val KEY_RECENT_GLOSSARY_IDS = "recent_glossary_ids"
         const val PENDING_UNLOCK_TTL_MS = 60_000L
         const val SESSION_WINDOW_MS = 5 * 60_000L

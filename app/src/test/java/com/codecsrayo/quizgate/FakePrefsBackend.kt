@@ -20,6 +20,8 @@ class FakePrefsBackend : PrefsBackend {
     private var lastGlossaryFetch: Long = 0L
     private var glossaryPushEnabled: Boolean = false
     private var glossaryPushInterval: Int = Prefs.DEFAULT_GLOSSARY_PUSH_INTERVAL_MIN
+    private var glossaryActiveStart: Int = Prefs.DEFAULT_GLOSSARY_ACTIVE_START_MIN
+    private var glossaryActiveEnd: Int = Prefs.DEFAULT_GLOSSARY_ACTIVE_END_MIN
     private var recentGlossary: List<String> = emptyList()
     private val lastSeen: MutableMap<String, Long> = HashMap()
     private val sessionStart: MutableMap<String, Long> = HashMap()
@@ -76,6 +78,11 @@ class FakePrefsBackend : PrefsBackend {
     override fun setGlossaryPushIntervalMin(minutes: Int) {
         glossaryPushInterval = minutes.coerceAtLeast(15)
     }
+
+    override fun getGlossaryActiveStartMin() = glossaryActiveStart
+    override fun setGlossaryActiveStartMin(min: Int) { glossaryActiveStart = min.coerceIn(0, 1440) }
+    override fun getGlossaryActiveEndMin() = glossaryActiveEnd
+    override fun setGlossaryActiveEndMin(min: Int) { glossaryActiveEnd = min.coerceIn(0, 1440) }
 
     override fun getRecentGlossaryIds() = recentGlossary
     override fun pushRecentGlossaryId(id: String, maxSize: Int) {

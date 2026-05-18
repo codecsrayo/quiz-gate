@@ -35,6 +35,10 @@
     <string name="perm_change">Cambiar</string>
     <string name="perm_grant_next">Conceder siguiente permiso (%1$d restante)</string>
     <string name="perm_all_granted">Todos los permisos están listos.</string>
+    <string name="glossary_active_window_title">Horario activo</string>
+    <string name="glossary_active_window_hint">Las notificaciones del glosario solo se entregan dentro de este rango. Igualar inicio y fin = sin restricción.</string>
+    <string name="glossary_active_from">Desde</string>
+    <string name="glossary_active_to">Hasta</string>
 
     <string name="questions_cache_title">Banco de preguntas</string>
     <string name="questions_official_title">Preguntas oficiales (practitioner)</string>
