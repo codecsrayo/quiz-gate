@@ -33,6 +33,8 @@
     <string name="perm_open_miui_other_hint">Activa “Mostrar ventanas emergentes en segundo plano” y “Mostrar en pantalla de bloqueo”.</string>
     <string name="perm_grant">Conceder</string>
     <string name="perm_change">Cambiar</string>
+    <string name="perm_grant_next">Conceder siguiente permiso (%1$d restante)</string>
+    <string name="perm_all_granted">Todos los permisos están listos.</string>
 
     <string name="questions_cache_title">Banco de preguntas</string>
     <string name="questions_official_title">Preguntas oficiales (practitioner)</string>

@@ -33,6 +33,8 @@
     <string name="perm_open_miui_other_hint">Enable “Show pop-up windows while running in background” and “Show on lock screen”.</string>
     <string name="perm_grant">Grant</string>
     <string name="perm_change">Change</string>
+    <string name="perm_grant_next">Grant next permission (%1$d left)</string>
+    <string name="perm_all_granted">All permissions are set.</string>
 
     <string name="questions_cache_title">Question bank</string>
     <string name="questions_official_title">Official questions (practitioner)</string>

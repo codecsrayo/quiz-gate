@@ -61,6 +61,15 @@ class MainActivity : ComponentActivity() {
             if (!granted) notifPermLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
 
+        // Battery optimization request shows as a system dialog over the app
+        // rather than navigating to a full Settings page, so auto-launching it on
+        // every cold start while still missing is one tap to grant. Overlay and
+        // accessibility do open full Settings activities — we don't auto-launch
+        // those, the Setup screen drives them via the "grant next" button.
+        if (!Permissions.isIgnoringBatteryOptimizations(this)) {
+            Permissions.requestIgnoreBatteryOptimizations(this)
+        }
+
         WatchdogService.start(this)
         GlossaryNotifications.ensureChannel(this)
         GlossaryPushWorker.applyFromPrefs(this)
@@ -77,8 +86,17 @@ private enum class Screen { Home, Config }
 
 @Composable
 private fun AppRoot() {
-    var screen by rememberSaveable { mutableStateOf(Screen.Home) }
     val context = LocalContext.current
+    // First launch (and every cold start with a missing permission) opens directly
+    // on the Setup screen so users aren't faced with a Home that warns and then
+    // does nothing useful. rememberSaveable preserves their choice across
+    // configuration changes but re-runs the initializer on a fresh process.
+    var screen by rememberSaveable {
+        val permsOk = Permissions.isAccessibilityEnabled(context) &&
+            Permissions.canDrawOverlays(context) &&
+            Permissions.isIgnoringBatteryOptimizations(context)
+        mutableStateOf(if (permsOk) Screen.Home else Screen.Config)
+    }
     var lang by remember { mutableStateOf(Prefs.getLang(context)) }
 
     BackHandler(enabled = screen == Screen.Config) { screen = Screen.Home }
@@ -639,6 +657,16 @@ private fun PermissionsCard(
     onMiuiOther: () -> Unit,
 ) {
     val allOk = perms.accessibility && perms.overlay && perms.battery
+    // Pick the first missing permission so the prominent "grant next" button
+    // targets exactly that one. After the user returns the lifecycle observer
+    // refreshes `perms` and the button re-points to whatever is next missing.
+    val nextMissing: Pair<Int, () -> Unit>? = when {
+        !perms.accessibility -> R.string.perm_grant_next to onAccessibility
+        !perms.overlay -> R.string.perm_grant_next to onOverlay
+        !perms.battery -> R.string.perm_grant_next to onBattery
+        else -> null
+    }
+    val missingCount = listOf(perms.accessibility, perms.overlay, perms.battery).count { !it }
     ElevatedCard {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -651,6 +679,20 @@ private fun PermissionsCard(
                     text = if (allOk) "OK" else stringResource(R.string.permissions_pending),
                     color = if (allOk) Color(0xFF2E7D32) else Color(0xFFC62828),
                     fontWeight = FontWeight.Bold,
+                )
+            }
+            if (nextMissing != null) {
+                Button(
+                    onClick = nextMissing.second,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(stringResource(nextMissing.first, missingCount))
+                }
+            } else {
+                Text(
+                    stringResource(R.string.perm_all_granted),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color(0xFF2E7D32),
                 )
             }
             PermissionRow(

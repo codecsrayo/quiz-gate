@@ -32,9 +32,22 @@ object Permissions {
     }
 
     fun openAccessibilitySettings(ctx: Context) {
-        val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+        // Android 12+ accepts a deep-link straight to our service's toggle screen.
+        // String-literal action and extra key keep this compileable against older
+        // platform stubs and just fail the startActivity on devices that don't
+        // implement it, letting the fallback list intent take over.
+        val componentName = ComponentName(ctx, BlockerAccessibilityService::class.java).flattenToString()
+        val deepLink = Intent("android.settings.ACCESSIBILITY_DETAILS_SETTINGS")
+            .putExtra("android.provider.extra.ACCESSIBILITY_SERVICE_COMPONENT_NAME", componentName)
+            // Older OEM skins honour these to scroll-and-highlight the matched row.
+            .putExtra(":settings:fragment_args_key", componentName)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        runCatching { ctx.startActivity(intent) }
+        if (runCatching { ctx.startActivity(deepLink) }.isSuccess) return
+
+        val fallback = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+            .putExtra(":settings:fragment_args_key", componentName)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        runCatching { ctx.startActivity(fallback) }
     }
 
     fun requestOverlayPermission(ctx: Context) {
