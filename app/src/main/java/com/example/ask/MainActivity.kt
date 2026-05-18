@@ -341,15 +341,6 @@ private fun ConfigScreen(
     }
 }
 
-private data class AppEntry(val pkg: String, val label: String)
-
-private val KNOWN_APPS = listOf(
-    AppEntry("com.facebook.katana", "Facebook"),
-    AppEntry("com.facebook.lite", "Facebook Lite"),
-    AppEntry("com.whatsapp", "WhatsApp"),
-    AppEntry("com.instagram.android", "Instagram"),
-)
-
 private data class PermStatus(
     val accessibility: Boolean,
     val overlay: Boolean,
@@ -524,7 +515,7 @@ private fun SetupScreen(
             ElevatedCard {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(stringResource(R.string.blocked_apps_title), style = MaterialTheme.typography.titleMedium)
-                    KNOWN_APPS.forEach { entry ->
+                    BlockableApps.ALL.forEach { entry ->
                         val checked = entry.pkg in blocked
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Checkbox(

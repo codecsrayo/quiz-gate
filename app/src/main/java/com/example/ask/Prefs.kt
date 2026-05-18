@@ -36,12 +36,7 @@ object Prefs {
     private const val KEY_LAST_SEEN_PREFIX = "last_seen_"
     private const val KEY_SESSION_START_PREFIX = "session_start_"
 
-    val DEFAULT_BLOCKED: Set<String> = setOf(
-        "com.facebook.katana",
-        "com.facebook.lite",
-        "com.whatsapp",
-        "com.instagram.android",
-    )
+    val DEFAULT_BLOCKED: Set<String> = BlockableApps.DEFAULT_PACKAGES
 
     private fun sp(ctx: Context): SharedPreferences =
         ctx.applicationContext.getSharedPreferences(FILE, Context.MODE_PRIVATE)
