@@ -7,7 +7,7 @@ import org.json.JSONObject
 object Prefs {
     private const val FILE = "quizgate_prefs"
 
-    private const val KEY_BLOCKED = "blocked_packages"
+    const val KEY_BLOCKED = "blocked_packages"
     private const val KEY_API_URL = "api_url"
     private const val KEY_GLOSSARY_API_URL = "glossary_api_url"
     private const val KEY_PENDING_UNLOCK_PKG = "pending_unlock_pkg"
@@ -40,6 +40,20 @@ object Prefs {
 
     private fun sp(ctx: Context): SharedPreferences =
         ctx.applicationContext.getSharedPreferences(FILE, Context.MODE_PRIVATE)
+
+    fun registerChangeListener(
+        ctx: Context,
+        listener: SharedPreferences.OnSharedPreferenceChangeListener,
+    ) {
+        sp(ctx).registerOnSharedPreferenceChangeListener(listener)
+    }
+
+    fun unregisterChangeListener(
+        ctx: Context,
+        listener: SharedPreferences.OnSharedPreferenceChangeListener,
+    ) {
+        sp(ctx).unregisterOnSharedPreferenceChangeListener(listener)
+    }
 
     fun getBlockedPackages(ctx: Context): Set<String> =
         sp(ctx).getStringSet(KEY_BLOCKED, DEFAULT_BLOCKED) ?: DEFAULT_BLOCKED

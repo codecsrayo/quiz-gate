@@ -3,6 +3,7 @@ package com.example.ask
 import android.accessibilityservice.AccessibilityService
 import android.content.Context
 import android.content.Intent
+import android.content.SharedPreferences
 import android.media.AudioManager
 import android.os.Handler
 import android.os.Looper
@@ -36,12 +37,24 @@ class BlockerAccessibilityService : AccessibilityService() {
     @Volatile private var lastForegroundPkg: String? = null
     @Volatile private var lastLaunchMs: Long = 0L
 
+    // Read on every TYPE_WINDOW_STATE_CHANGED. Cached here and refreshed via the
+    // SharedPreferences change listener below so we don't hit disk per event.
+    @Volatile private var blockedCache: Set<String> = emptySet()
+
+    private val prefsListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+        if (key == null || key == Prefs.KEY_BLOCKED) {
+            blockedCache = Prefs.getBlockedPackages(this)
+        }
+    }
+
     private val handler = Handler(Looper.getMainLooper())
     private var pendingTimeout: Runnable? = null
 
     override fun onServiceConnected() {
         super.onServiceConnected()
         Log.i(TAG, "AccessibilityService connected")
+        blockedCache = Prefs.getBlockedPackages(this)
+        Prefs.registerChangeListener(this, prefsListener)
         WatchdogService.start(this)
     }
 
@@ -57,7 +70,7 @@ class BlockerAccessibilityService : AccessibilityService() {
         if (pkg == prev) return
         lastForegroundPkg = pkg
 
-        val blocked = Prefs.getBlockedPackages(this)
+        val blocked = blockedCache
 
         // Leaving a blocked app:
         //  - To transient (launcher/systemui/recents) → keep session alive (touch lastSeen)
@@ -206,6 +219,7 @@ class BlockerAccessibilityService : AccessibilityService() {
 
     override fun onDestroy() {
         cancelTimeout()
+        runCatching { Prefs.unregisterChangeListener(this, prefsListener) }
         super.onDestroy()
     }
 
