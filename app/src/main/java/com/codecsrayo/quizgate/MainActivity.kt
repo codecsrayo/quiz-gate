@@ -155,7 +155,15 @@ private fun HomeScreen(lang: String, onStartQuiz: () -> Unit, onOpenConfig: () -
     }
 
     LaunchedEffect(Unit) {
-        val cached = repo.loadCached()
+        var cached = repo.loadCached()
+        if (cached.isEmpty()) {
+            // First launch with no cache: pull from the API so the user lands
+            // on a usable Home (filter counts, domain chips) instead of an
+            // empty card that forces them into Setup to tap "Sync now".
+            // Failures are silent here — the Setup screen's manual sync button
+            // (and QuizActivity's own retry path) cover the offline case.
+            repo.refreshFromNetwork().onSuccess { cached = repo.loadCached() }
+        }
         pool = cached
         refreshDomains(cached)
     }
@@ -398,7 +406,15 @@ private fun SetupScreen(
     var syncing by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
-        val cached = repo.loadCached()
+        var cached = repo.loadCached()
+        if (cached.isEmpty()) {
+            syncing = true
+            repo.refreshFromNetwork().onSuccess {
+                cached = repo.loadCached()
+                lastFetch = Prefs.getLastFetch(context)
+            }
+            syncing = false
+        }
         realCount = cached.count { !it.synthetic }
         syntheticCount = cached.count { it.synthetic }
     }
