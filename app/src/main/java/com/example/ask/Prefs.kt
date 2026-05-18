@@ -220,7 +220,21 @@ object Prefs {
 
     data class QStat(val shown: Int, val correct: Int, val wrong: Int)
 
+    // Stats are read on every pickRandom (weighted sort) and written on every
+    // shown/answer. Parsing JSON on each call shows up in profiles, so we cache
+    // the parsed map in memory and write-through on every mutation. Single-process
+    // app — no IPC concerns.
+    @Volatile private var statsCache: Map<String, QStat>? = null
+    private val statsLock = Any()
+
     fun getStats(ctx: Context): Map<String, QStat> {
+        statsCache?.let { return it }
+        return synchronized(statsLock) {
+            statsCache ?: loadStatsFromDisk(ctx).also { statsCache = it }
+        }
+    }
+
+    private fun loadStatsFromDisk(ctx: Context): Map<String, QStat> {
         val raw = sp(ctx).getString(KEY_QUESTION_STATS, null) ?: return emptyMap()
         return runCatching {
             val obj = JSONObject(raw)
@@ -236,6 +250,7 @@ object Prefs {
     }
 
     private fun saveStats(ctx: Context, stats: Map<String, QStat>) {
+        statsCache = stats
         val obj = JSONObject()
         for ((k, v) in stats) {
             obj.put(k, JSONObject().put("s", v.shown).put("c", v.correct).put("w", v.wrong))
@@ -244,16 +259,20 @@ object Prefs {
     }
 
     fun recordShown(ctx: Context, id: String) {
-        val stats = getStats(ctx).toMutableMap()
-        val s = stats[id] ?: QStat(0, 0, 0)
-        stats[id] = s.copy(shown = s.shown + 1)
-        saveStats(ctx, stats)
+        synchronized(statsLock) {
+            val stats = getStats(ctx).toMutableMap()
+            val s = stats[id] ?: QStat(0, 0, 0)
+            stats[id] = s.copy(shown = s.shown + 1)
+            saveStats(ctx, stats)
+        }
     }
 
     fun recordAnswer(ctx: Context, id: String, correct: Boolean) {
-        val stats = getStats(ctx).toMutableMap()
-        val s = stats[id] ?: QStat(0, 0, 0)
-        stats[id] = if (correct) s.copy(correct = s.correct + 1) else s.copy(wrong = s.wrong + 1)
-        saveStats(ctx, stats)
+        synchronized(statsLock) {
+            val stats = getStats(ctx).toMutableMap()
+            val s = stats[id] ?: QStat(0, 0, 0)
+            stats[id] = if (correct) s.copy(correct = s.correct + 1) else s.copy(wrong = s.wrong + 1)
+            saveStats(ctx, stats)
+        }
     }
 }
