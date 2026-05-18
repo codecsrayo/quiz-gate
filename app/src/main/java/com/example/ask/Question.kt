@@ -1,5 +1,6 @@
 package com.example.ask
 
+import android.util.Log
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -41,7 +42,9 @@ object QuestionParser {
         val out = ArrayList<Question>(arr.length())
         for (i in 0 until arr.length()) {
             val obj = arr.getJSONObject(i)
-            runCatching { parseOne(obj) }.getOrNull()?.let { out.add(it) }
+            runCatching { parseOne(obj) }
+                .onSuccess { out.add(it) }
+                .onFailure { Log.w("QuizParser", "skip entry $i: ${it.message}") }
         }
         return out
     }
