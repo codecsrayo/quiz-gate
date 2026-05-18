@@ -1,0 +1,107 @@
+<resources>
+    <string name="app_name">Quiz Gate</string>
+    <string name="accessibility_service_label">Quiz Gate Blocker</string>
+    <string name="accessibility_service_description">Detects when you open Facebook, WhatsApp or Instagram and shows you a quiz question before letting you continue.</string>
+
+    <string name="home_tagline">Practice for the exam.</string>
+    <string name="home_subtitle">Start the quiz manually or let it appear when you open the blocked apps.</string>
+    <string name="home_bank_count">Question bank: %1$d</string>
+    <string name="home_bank_breakdown">Official and synthetic combined. Configure the bank from Settings.</string>
+    <string name="home_perms_warning">Missing permissions: automatic blocking won\'t work until you grant them in Settings.</string>
+    <string name="home_start_quiz">Start quiz</string>
+    <string name="home_start_disabled_hint">No questions cached. Open Settings and tap “Sync now”.</string>
+    <string name="home_open_config">Settings</string>
+    <string name="config_title">Settings</string>
+    <string name="back">Back</string>
+
+    <string name="setup_title">Quiz Gate</string>
+    <string name="setup_intro">Before opening Facebook, WhatsApp or Instagram, this app makes you answer a quiz question correctly.</string>
+    <string name="open_accessibility_settings">Open Accessibility settings</string>
+    <string name="accessibility_enabled">Accessibility service: enabled</string>
+    <string name="accessibility_disabled">Accessibility service: disabled</string>
+
+    <string name="permissions_title">Required permissions</string>
+    <string name="permissions_pending">Missing permissions</string>
+    <string name="perm_accessibility">Accessibility service</string>
+    <string name="perm_accessibility_hint">To detect when you open a blocked app.</string>
+    <string name="perm_overlay">Display over other apps</string>
+    <string name="perm_overlay_hint">Lets the quiz appear on top of WhatsApp/Facebook/Instagram.</string>
+    <string name="perm_battery">No battery optimization</string>
+    <string name="perm_battery_hint">Prevents HyperOS/Android from killing the background service.</string>
+    <string name="perm_open_miui_autostart">Open Autostart (MIUI/HyperOS)</string>
+    <string name="perm_open_miui_other">Open Other permissions (MIUI/HyperOS)</string>
+    <string name="perm_open_miui_other_hint">Enable “Show pop-up windows while running in background” and “Show on lock screen”.</string>
+    <string name="perm_grant">Grant</string>
+    <string name="perm_change">Change</string>
+
+    <string name="questions_cache_title">Question bank</string>
+    <string name="questions_official_title">Official questions (practitioner)</string>
+    <string name="questions_synthetic_title">Synthetic questions</string>
+    <string name="questions_synthetic_hint">Automatically generated. Useful for variety; double-check before relying on them.</string>
+    <string name="questions_cached_count">Cached questions: %1$d</string>
+    <string name="never_synced">Not synced yet.</string>
+    <string name="last_sync">Last sync: %1$s</string>
+    <string name="sync_now">Sync now</string>
+    <string name="language_title">Language</string>
+
+    <string name="blocked_apps_title">Blocked apps</string>
+    <string name="api_url_title">API URL</string>
+    <string name="save_settings">Save</string>
+    <string name="max_in_app_title">Maximum time in app</string>
+    <string name="max_in_app_hint">Minutes before asking again.</string>
+    <string name="max_in_app_label">Minutes</string>
+    <string name="domain_filter_title">Included domains</string>
+    <string name="home_filters_title">Quiz filters</string>
+    <string name="home_filters_hint">Applies to both practice mode and automatic blocking.</string>
+    <string name="home_source_official">Official</string>
+    <string name="home_source_synthetic">Synthetic</string>
+    <string name="home_filtered_count">Available with filters: %1$d</string>
+    <string name="home_no_sources">Select at least one source.</string>
+
+    <string name="glossary_push_title">AWS glossary by notification</string>
+    <string name="glossary_push_hint">Receive a glossary term every so often.</string>
+    <string name="glossary_push_enabled">Enabled</string>
+    <string name="glossary_push_interval">Every</string>
+    <string name="glossary_push_test">Test now</string>
+    <string name="glossary_url_title">Glossary URL</string>
+
+    <!-- Quiz screen -->
+    <string name="quiz_err_no_cache">No questions cached. Open the main app and tap \'Sync\'.</string>
+    <string name="quiz_err_no_source">Select at least one source (official or synthetic) in Home.</string>
+    <string name="quiz_err_no_source_questions">No questions for the selected source. Adjust the filter in Home.</string>
+    <string name="quiz_err_no_domain">No selected domain has questions. Adjust the filter.</string>
+    <string name="quiz_err_download">Couldn\'t download the quiz: %1$s</string>
+    <string name="quiz_err_offline">No connection: %1$s</string>
+    <string name="quiz_synthetic_cd">Synthetic question</string>
+    <string name="quiz_correct">Correct</string>
+    <string name="quiz_incorrect">Incorrect</string>
+    <string name="quiz_tip">Tip: %1$s</string>
+    <string name="quiz_check_multi">Check (select all correct answers)</string>
+    <string name="quiz_check">Check</string>
+    <string name="quiz_another">Another question</string>
+    <string name="quiz_continue">Continue</string>
+    <string name="quiz_continue_disabled">Answer correctly to continue</string>
+    <string name="quiz_cancel">Cancel</string>
+    <string name="quiz_exit">Exit</string>
+    <string name="quiz_retry">Retry</string>
+
+    <!-- Common messages -->
+    <string name="error_generic">error</string>
+    <string name="error_unknown">unknown</string>
+
+    <!-- Sync and glossary -->
+    <string name="sync_result">Synced %1$d (official=%2$d · synthetic=%3$d)</string>
+    <string name="sync_error">Error: %1$s</string>
+    <string name="glossary_error">Glossary error: %1$s</string>
+    <string name="glossary_empty">Empty glossary</string>
+    <string name="glossary_sent">Notification sent: %1$s</string>
+    <string name="glossary_channel_name">AWS Glossary</string>
+    <string name="glossary_channel_desc">Scheduled AWS glossary terms</string>
+    <string name="glossary_alias_label">Aliases:</string>
+
+    <!-- Background service -->
+    <string name="watchdog_notif_title">Quiz Gate active</string>
+    <string name="watchdog_notif_text">Watching WhatsApp, Facebook and Instagram</string>
+    <string name="watchdog_channel_name">Quiz Gate</string>
+    <string name="watchdog_channel_desc">Keeps blocking active in the background</string>
+</resources>

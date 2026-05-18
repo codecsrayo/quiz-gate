@@ -64,4 +64,44 @@
     <string name="glossary_push_interval">Cada</string>
     <string name="glossary_push_test">Probar ahora</string>
     <string name="glossary_url_title">URL del glosario</string>
+
+    <!-- Pantalla del quiz -->
+    <string name="quiz_err_no_cache">No hay preguntas en caché. Abre la app principal y pulsa \'Sincronizar\'.</string>
+    <string name="quiz_err_no_source">Marca al menos una fuente (oficiales o sintéticas) en Home.</string>
+    <string name="quiz_err_no_source_questions">No hay preguntas para la fuente seleccionada. Ajusta el filtro en Home.</string>
+    <string name="quiz_err_no_domain">Ningún dominio seleccionado tiene preguntas. Ajusta el filtro.</string>
+    <string name="quiz_err_download">No se pudo descargar el quiz: %1$s</string>
+    <string name="quiz_err_offline">Sin conexión: %1$s</string>
+    <string name="quiz_synthetic_cd">Pregunta sintética</string>
+    <string name="quiz_correct">Correcto</string>
+    <string name="quiz_incorrect">Incorrecto</string>
+    <string name="quiz_tip">Tip: %1$s</string>
+    <string name="quiz_check_multi">Comprobar (selecciona todas las correctas)</string>
+    <string name="quiz_check">Comprobar</string>
+    <string name="quiz_another">Otra pregunta</string>
+    <string name="quiz_continue">Continuar</string>
+    <string name="quiz_continue_disabled">Acierta para continuar</string>
+    <string name="quiz_cancel">Cancelar</string>
+    <string name="quiz_exit">Salir</string>
+    <string name="quiz_retry">Reintentar</string>
+
+    <!-- Mensajes comunes -->
+    <string name="error_generic">error</string>
+    <string name="error_unknown">desconocido</string>
+
+    <!-- Sincronización y glosario -->
+    <string name="sync_result">Sincronizadas %1$d (oficiales=%2$d · sintéticas=%3$d)</string>
+    <string name="sync_error">Error: %1$s</string>
+    <string name="glossary_error">Error glosario: %1$s</string>
+    <string name="glossary_empty">Glosario vacío</string>
+    <string name="glossary_sent">Notificación enviada: %1$s</string>
+    <string name="glossary_channel_name">Glosario AWS</string>
+    <string name="glossary_channel_desc">Términos del glosario AWS programados</string>
+    <string name="glossary_alias_label">Alias:</string>
+
+    <!-- Servicio en segundo plano -->
+    <string name="watchdog_notif_title">Quiz Gate activo</string>
+    <string name="watchdog_notif_text">Vigilando WhatsApp, Facebook e Instagram</string>
+    <string name="watchdog_channel_name">Quiz Gate</string>
+    <string name="watchdog_channel_desc">Mantiene el bloqueo activo en segundo plano</string>
 </resources>

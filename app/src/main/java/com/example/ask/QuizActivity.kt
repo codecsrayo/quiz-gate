@@ -1,11 +1,13 @@
 package com.example.ask
 
+import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.compose.setContent
+import androidx.annotation.StringRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
@@ -13,14 +15,16 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Science
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.ask.ui.theme.AskTheme
 import kotlinx.coroutines.launch
@@ -31,6 +35,10 @@ class QuizActivity : ComponentActivity() {
         const val EXTRA_TRIGGER_PKG = "trigger_pkg"
         const val EXTRA_PRACTICE_MODE = "practice_mode"
         private const val TAG = "QuizGate"
+    }
+
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(LocaleManager.wrap(newBase))
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -49,10 +57,17 @@ class QuizActivity : ComponentActivity() {
 
         setContent {
             AskTheme {
-                Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-                    QuizGateScreen(
-                        practiceMode = practice,
-                        onUnlock = {
+                var lang by remember { mutableStateOf(Prefs.getLang(this@QuizActivity)) }
+                LocalizedContent(lang) {
+                    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+                        QuizGateScreen(
+                            practiceMode = practice,
+                            lang = lang,
+                            onLangChange = { newLang ->
+                                lang = newLang
+                                Prefs.setLang(this@QuizActivity, newLang)
+                            },
+                            onUnlock = {
                             Log.i(TAG, "QuizActivity onUnlock pressed practice=$practice")
                             if (!practice) {
                                 val pkg = Prefs.getLastBlockedPackage(this)
@@ -81,6 +96,7 @@ class QuizActivity : ComponentActivity() {
                         },
                     )
                 }
+                }
             }
         }
     }
@@ -94,7 +110,7 @@ class QuizActivity : ComponentActivity() {
 
 private sealed interface UiState {
     data object Loading : UiState
-    data class Error(val message: String) : UiState
+    data class Error(@StringRes val messageRes: Int, val detail: String? = null) : UiState
     data class Showing(
         val question: Question,
         val selected: Set<Int>,
@@ -105,6 +121,8 @@ private sealed interface UiState {
 @Composable
 private fun QuizGateScreen(
     practiceMode: Boolean,
+    lang: String,
+    onLangChange: (String) -> Unit,
     onUnlock: () -> Unit,
     onCancel: () -> Unit,
 ) {
@@ -112,30 +130,29 @@ private fun QuizGateScreen(
     val repo = remember { QuizRepository(context) }
     val scope = rememberCoroutineScope()
 
-    var lang by remember { mutableStateOf(Prefs.getLang(context)) }
     var pool by remember { mutableStateOf<List<Question>>(emptyList()) }
     var state by remember { mutableStateOf<UiState>(UiState.Loading) }
 
     fun pickRandom(): UiState {
         if (pool.isEmpty()) {
-            return UiState.Error("No hay preguntas en caché. Abre la app principal y pulsa 'Sincronizar'.")
+            return UiState.Error(R.string.quiz_err_no_cache)
         }
         val includeOfficial = Prefs.isIncludeOfficial(context)
         val includeSynthetic = Prefs.isIncludeSynthetic(context)
         if (!includeOfficial && !includeSynthetic) {
-            return UiState.Error("Marca al menos una fuente (oficiales o sintéticas) en Home.")
+            return UiState.Error(R.string.quiz_err_no_source)
         }
         val bySource = pool.filter { q ->
             (q.synthetic && includeSynthetic) || (!q.synthetic && includeOfficial)
         }
         if (bySource.isEmpty()) {
-            return UiState.Error("No hay preguntas para la fuente seleccionada. Ajusta el filtro en Home.")
+            return UiState.Error(R.string.quiz_err_no_source_questions)
         }
         val enabledDomains = Prefs.getEnabledDomainsOrNull(context)
         val byDomain = if (enabledDomains == null) bySource
             else bySource.filter { it.domain in enabledDomains }
         if (byDomain.isEmpty()) {
-            return UiState.Error("Ningún dominio seleccionado tiene preguntas. Ajusta el filtro.")
+            return UiState.Error(R.string.quiz_err_no_domain)
         }
         val recent = Prefs.getRecentQuestionIds(context).toSet()
         val candidates = byDomain.filterNot { it.id in recent }
@@ -171,7 +188,7 @@ private fun QuizGateScreen(
                 pool = repo.loadCached()
                 state = pickRandom()
             }.onFailure {
-                state = UiState.Error("No se pudo descargar el quiz: ${it.message ?: "error"}")
+                state = UiState.Error(R.string.quiz_err_download, it.message ?: "error")
             }
         }
     }
@@ -183,13 +200,16 @@ private fun QuizGateScreen(
             .padding(16.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("Quiz Gate", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
+            Text(
+                stringResource(R.string.app_name),
+                style = MaterialTheme.typography.titleLarge,
+                modifier = Modifier.weight(1f),
+            )
             FilterChip(
                 selected = lang == "es",
                 onClick = {
                     Log.i("QuizGate", "Lang chip tap -> es (was=$lang)")
-                    lang = "es"
-                    Prefs.setLang(context, "es")
+                    onLangChange("es")
                 },
                 label = { Text("ES") }
             )
@@ -198,8 +218,7 @@ private fun QuizGateScreen(
                 selected = lang == "en",
                 onClick = {
                     Log.i("QuizGate", "Lang chip tap -> en (was=$lang)")
-                    lang = "en"
-                    Prefs.setLang(context, "en")
+                    onLangChange("en")
                 },
                 label = { Text("EN") }
             )
@@ -219,7 +238,10 @@ private fun QuizGateScreen(
                     verticalArrangement = Arrangement.Center,
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Text(s.message)
+                    Text(
+                        if (s.detail != null) stringResource(s.messageRes, s.detail)
+                        else stringResource(s.messageRes)
+                    )
                     Spacer(Modifier.height(16.dp))
                     Button(onClick = {
                         scope.launch {
@@ -228,10 +250,10 @@ private fun QuizGateScreen(
                                 pool = repo.loadCached()
                                 state = pickRandom()
                             }.onFailure {
-                                state = UiState.Error("Sin conexión: ${it.message ?: "error"}")
+                                state = UiState.Error(R.string.quiz_err_offline, it.message ?: "error")
                             }
                         }
-                    }) { Text("Reintentar") }
+                    }) { Text(stringResource(R.string.quiz_retry)) }
                 }
 
                 is UiState.Showing -> QuestionView(
@@ -265,21 +287,30 @@ private fun QuizGateScreen(
                 OutlinedButton(
                     onClick = onCancel,
                     modifier = Modifier.weight(1f)
-                ) { Text("Salir") }
+                ) { Text(stringResource(R.string.quiz_exit)) }
                 Spacer(Modifier.width(8.dp))
                 Button(
                     onClick = { state = pickRandom() },
                     enabled = state is UiState.Showing,
                     modifier = Modifier.weight(2f)
-                ) { Text("Otra pregunta") }
+                ) { Text(stringResource(R.string.quiz_another)) }
             } else {
                 Button(
                     onClick = onUnlock,
                     enabled = isCorrect,
                     modifier = Modifier.weight(2f)
-                ) { Text(if (isCorrect) "Continuar" else "Acierta para continuar") }
+                ) {
+                    Text(
+                        stringResource(
+                            if (isCorrect) R.string.quiz_continue
+                            else R.string.quiz_continue_disabled
+                        )
+                    )
+                }
                 Spacer(Modifier.width(8.dp))
-                OutlinedButton(onClick = onCancel, modifier = Modifier.weight(1f)) { Text("Cancelar") }
+                OutlinedButton(onClick = onCancel, modifier = Modifier.weight(1f)) {
+                    Text(stringResource(R.string.quiz_cancel))
+                }
             }
         }
     }
@@ -304,14 +335,18 @@ private fun QuestionView(
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            AssistChip(onClick = {}, label = { Text(q.domainText(lang)) })
-            Spacer(Modifier.width(8.dp))
-            Text(
-                text = if (q.isMultiResponse) "${q.id} · Multi×${correct.size}" else q.id,
-                style = MaterialTheme.typography.labelSmall,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f)
+            AssistChip(
+                onClick = {},
+                label = { Text(q.domainText(lang)) },
+                leadingIcon = if (q.synthetic) {
+                    {
+                        Icon(
+                            Icons.Filled.Science,
+                            contentDescription = stringResource(R.string.quiz_synthetic_cd),
+                            modifier = Modifier.size(AssistChipDefaults.IconSize),
+                        )
+                    }
+                } else null,
             )
         }
 
@@ -378,8 +413,10 @@ private fun QuestionView(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text(
-                    if (q.isMultiResponse) "Comprobar (selecciona todas las correctas)"
-                    else "Comprobar"
+                    stringResource(
+                        if (q.isMultiResponse) R.string.quiz_check_multi
+                        else R.string.quiz_check
+                    )
                 )
             }
         } else {
@@ -392,7 +429,9 @@ private fun QuestionView(
             ) {
                 Column(Modifier.padding(12.dp)) {
                     Text(
-                        text = if (isCorrect) "Correcto" else "Incorrecto",
+                        text = stringResource(
+                            if (isCorrect) R.string.quiz_correct else R.string.quiz_incorrect
+                        ),
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold,
                     )
@@ -400,13 +439,16 @@ private fun QuestionView(
                     Text(q.explanationFor(lang))
                     if (q.tipFor(lang).isNotBlank()) {
                         Spacer(Modifier.height(8.dp))
-                        Text("Tip: ${q.tipFor(lang)}", style = MaterialTheme.typography.bodySmall)
+                        Text(
+                            stringResource(R.string.quiz_tip, q.tipFor(lang)),
+                            style = MaterialTheme.typography.bodySmall,
+                        )
                     }
                 }
             }
             if (!isCorrect) {
                 OutlinedButton(onClick = onNext, modifier = Modifier.fillMaxWidth()) {
-                    Text("Otra pregunta")
+                    Text(stringResource(R.string.quiz_another))
                 }
             }
         }

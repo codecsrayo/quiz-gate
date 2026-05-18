@@ -34,9 +34,10 @@ class WatchdogService : Service() {
             this, 0, openIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
+        val res = LocaleManager.wrap(this)
         val notification: Notification = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("Quiz Gate activo")
-            .setContentText("Vigilando WhatsApp, Facebook e Instagram")
+            .setContentTitle(res.getString(R.string.watchdog_notif_title))
+            .setContentText(res.getString(R.string.watchdog_notif_text))
             .setSmallIcon(android.R.drawable.ic_lock_lock)
             .setOngoing(true)
             .setContentIntent(pi)
@@ -59,12 +60,13 @@ class WatchdogService : Service() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val nm = getSystemService(NotificationManager::class.java) ?: return
         if (nm.getNotificationChannel(CHANNEL_ID) != null) return
+        val res = LocaleManager.wrap(this)
         val channel = NotificationChannel(
             CHANNEL_ID,
-            "Quiz Gate",
+            res.getString(R.string.watchdog_channel_name),
             NotificationManager.IMPORTANCE_LOW
         ).apply {
-            description = "Mantiene el bloqueo activo en segundo plano"
+            description = res.getString(R.string.watchdog_channel_desc)
             setShowBadge(false)
         }
         nm.createNotificationChannel(channel)

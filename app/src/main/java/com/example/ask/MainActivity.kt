@@ -1,6 +1,7 @@
 package com.example.ask
 
 import android.Manifest
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
@@ -45,6 +46,10 @@ class MainActivity : ComponentActivity() {
         ActivityResultContracts.RequestPermission()
     ) { /* result ignored — watchdog notification is low-priority */ }
 
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(LocaleManager.wrap(newBase))
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -74,25 +79,36 @@ private enum class Screen { Home, Config }
 private fun AppRoot() {
     var screen by rememberSaveable { mutableStateOf(Screen.Home) }
     val context = LocalContext.current
+    var lang by remember { mutableStateOf(Prefs.getLang(context)) }
 
     BackHandler(enabled = screen == Screen.Config) { screen = Screen.Home }
 
-    when (screen) {
-        Screen.Home -> HomeScreen(
-            onStartQuiz = {
-                val intent = Intent(context, QuizActivity::class.java)
-                    .putExtra(QuizActivity.EXTRA_PRACTICE_MODE, true)
-                context.startActivity(intent)
-            },
-            onOpenConfig = { screen = Screen.Config },
-        )
-        Screen.Config -> ConfigScreen(onBack = { screen = Screen.Home })
+    LocalizedContent(lang) {
+        when (screen) {
+            Screen.Home -> HomeScreen(
+                lang = lang,
+                onStartQuiz = {
+                    val intent = Intent(context, QuizActivity::class.java)
+                        .putExtra(QuizActivity.EXTRA_PRACTICE_MODE, true)
+                    context.startActivity(intent)
+                },
+                onOpenConfig = { screen = Screen.Config },
+            )
+            Screen.Config -> ConfigScreen(
+                lang = lang,
+                onLangChange = { newLang ->
+                    lang = newLang
+                    Prefs.setLang(context, newLang)
+                },
+                onBack = { screen = Screen.Home },
+            )
+        }
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun HomeScreen(onStartQuiz: () -> Unit, onOpenConfig: () -> Unit) {
+private fun HomeScreen(lang: String, onStartQuiz: () -> Unit, onOpenConfig: () -> Unit) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val repo = remember { QuizRepository(context) }
@@ -103,7 +119,6 @@ private fun HomeScreen(onStartQuiz: () -> Unit, onOpenConfig: () -> Unit) {
     var enabledDomains by remember { mutableStateOf<Set<String>?>(Prefs.getEnabledDomainsOrNull(context)) }
     var includeOfficial by remember { mutableStateOf(Prefs.isIncludeOfficial(context)) }
     var includeSynthetic by remember { mutableStateOf(Prefs.isIncludeSynthetic(context)) }
-    var lang by remember { mutableStateOf(Prefs.getLang(context)) }
     var perms by remember {
         mutableStateOf(
             PermStatus(
@@ -135,7 +150,6 @@ private fun HomeScreen(onStartQuiz: () -> Unit, onOpenConfig: () -> Unit) {
                     overlay = Permissions.canDrawOverlays(context),
                     battery = Permissions.isIgnoringBatteryOptimizations(context),
                 )
-                lang = Prefs.getLang(context)
                 enabledDomains = Prefs.getEnabledDomainsOrNull(context)
                 includeOfficial = Prefs.isIncludeOfficial(context)
                 includeSynthetic = Prefs.isIncludeSynthetic(context)
@@ -299,7 +313,11 @@ private fun HomeScreen(onStartQuiz: () -> Unit, onOpenConfig: () -> Unit) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun ConfigScreen(onBack: () -> Unit) {
+private fun ConfigScreen(
+    lang: String,
+    onLangChange: (String) -> Unit,
+    onBack: () -> Unit,
+) {
     Scaffold(
         topBar = {
             TopAppBar(
@@ -315,7 +333,11 @@ private fun ConfigScreen(onBack: () -> Unit) {
             )
         }
     ) { padding ->
-        SetupScreen(modifier = Modifier.padding(padding))
+        SetupScreen(
+            modifier = Modifier.padding(padding),
+            lang = lang,
+            onLangChange = onLangChange,
+        )
     }
 }
 
@@ -335,7 +357,11 @@ private data class PermStatus(
 )
 
 @Composable
-private fun SetupScreen(modifier: Modifier = Modifier) {
+private fun SetupScreen(
+    modifier: Modifier = Modifier,
+    lang: String,
+    onLangChange: (String) -> Unit,
+) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val scope = rememberCoroutineScope()
@@ -356,7 +382,6 @@ private fun SetupScreen(modifier: Modifier = Modifier) {
     var glossaryUrl by remember { mutableStateOf(Prefs.getGlossaryApiUrl(context)) }
     var glossaryPushEnabled by remember { mutableStateOf(Prefs.isGlossaryPushEnabled(context)) }
     var glossaryInterval by remember { mutableIntStateOf(Prefs.getGlossaryPushIntervalMin(context)) }
-    var lang by remember { mutableStateOf(Prefs.getLang(context)) }
     var maxMinutes by remember { mutableIntStateOf(Prefs.getMaxInAppMinutes(context)) }
     var realCount by remember { mutableIntStateOf(0) }
     var syntheticCount by remember { mutableIntStateOf(0) }
@@ -443,11 +468,18 @@ private fun SetupScreen(modifier: Modifier = Modifier) {
                                         realCount = cached.count { !it.synthetic }
                                         syntheticCount = cached.count { it.synthetic }
                                         snackbar.showSnackbar(
-                                            "Sincronizadas $n (oficiales=$realCount · sintéticas=$syntheticCount)"
+                                            context.getString(
+                                                R.string.sync_result, n, realCount, syntheticCount
+                                            )
                                         )
                                     }
                                     .onFailure {
-                                        snackbar.showSnackbar("Error: ${it.message ?: "desconocido"}")
+                                        snackbar.showSnackbar(
+                                            context.getString(
+                                                R.string.sync_error,
+                                                it.message ?: context.getString(R.string.error_unknown),
+                                            )
+                                        )
                                     }
                                 syncing = false
                             }
@@ -468,13 +500,13 @@ private fun SetupScreen(modifier: Modifier = Modifier) {
                     Row {
                         FilterChip(
                             selected = lang == "es",
-                            onClick = { lang = "es"; Prefs.setLang(context, "es") },
+                            onClick = { onLangChange("es") },
                             label = { Text("Español") }
                         )
                         Spacer(Modifier.width(8.dp))
                         FilterChip(
                             selected = lang == "en",
-                            onClick = { lang = "en"; Prefs.setLang(context, "en") },
+                            onClick = { onLangChange("en") },
                             label = { Text("English") }
                         )
                     }
@@ -576,19 +608,25 @@ private fun SetupScreen(modifier: Modifier = Modifier) {
                                         val r = repo.refreshFromNetwork()
                                         if (r.isFailure) {
                                             snackbar.showSnackbar(
-                                                "Error glosario: ${r.exceptionOrNull()?.message ?: "desconocido"}"
+                                                context.getString(
+                                                    R.string.glossary_error,
+                                                    r.exceptionOrNull()?.message
+                                                        ?: context.getString(R.string.error_unknown),
+                                                )
                                             )
                                             return@launch
                                         }
                                         terms = repo.loadCached()
                                     }
                                     if (terms.isEmpty()) {
-                                        snackbar.showSnackbar("Glosario vacío")
+                                        snackbar.showSnackbar(context.getString(R.string.glossary_empty))
                                         return@launch
                                     }
                                     val term = terms.random()
                                     GlossaryNotifications.postTerm(context, term, lang)
-                                    snackbar.showSnackbar("Notificación enviada: ${term.symbol}")
+                                    snackbar.showSnackbar(
+                                        context.getString(R.string.glossary_sent, term.symbol)
+                                    )
                                 }
                             }
                         ) { Text(stringResource(R.string.glossary_push_test)) }
