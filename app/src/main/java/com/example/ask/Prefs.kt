@@ -2,262 +2,128 @@ package com.example.ask
 
 import android.content.Context
 import android.content.SharedPreferences
+import androidx.annotation.VisibleForTesting
 
+/**
+ * Static facade preserving the historic `Prefs.foo(ctx)` callsite shape.
+ * All operations are forwarded to a [PrefsBackend] that's lazily initialised
+ * on first call. Tests swap it via [installForTest] / [reset].
+ */
 object Prefs {
-    private const val FILE = "quizgate_prefs"
 
     const val KEY_BLOCKED = "blocked_packages"
-    private const val KEY_API_URL = "api_url"
-    private const val KEY_GLOSSARY_API_URL = "glossary_api_url"
-    private const val KEY_PENDING_UNLOCK_PKG = "pending_unlock_pkg"
-    private const val KEY_PENDING_UNLOCK_UNTIL = "pending_unlock_until_ms"
-    private const val KEY_LAST_BLOCKED_PKG = "last_blocked_package"
-    private const val KEY_LAST_FETCH_MS = "last_fetch_ms"
-    private const val KEY_LANG = "lang"
-    private const val KEY_MAX_IN_APP_MIN = "max_in_app_min"
-    private const val KEY_ENABLED_DOMAINS = "enabled_domains"
-    private const val KEY_INCLUDE_OFFICIAL = "include_official"
-    private const val KEY_INCLUDE_SYNTHETIC = "include_synthetic"
-    private const val KEY_RECENT_QUESTION_IDS = "recent_question_ids"
-    private const val KEY_QUESTION_STATS = "question_stats"
-    private const val KEY_LAST_GLOSSARY_FETCH_MS = "last_glossary_fetch_ms"
-    private const val KEY_GLOSSARY_PUSH_ENABLED = "glossary_push_enabled"
-    private const val KEY_GLOSSARY_PUSH_INTERVAL_MIN = "glossary_push_interval_min"
-    private const val KEY_RECENT_GLOSSARY_IDS = "recent_glossary_ids"
 
     const val DEFAULT_API_URL = "https://codecsrayo.com/api/quiz/practitioner/questions"
     const val DEFAULT_GLOSSARY_API_URL = "https://codecsrayo.com/api/quiz/practitioner/glossary"
     const val DEFAULT_GLOSSARY_PUSH_INTERVAL_MIN = 60
     const val DEFAULT_LANG = "es"
     const val DEFAULT_MAX_IN_APP_MIN = 10
-    private const val PENDING_UNLOCK_TTL_MS = 60_000L
-    private const val SESSION_WINDOW_MS = 5 * 60_000L
-    private const val KEY_LAST_SEEN_PREFIX = "last_seen_"
-    private const val KEY_SESSION_START_PREFIX = "session_start_"
 
     val DEFAULT_BLOCKED: Set<String> = BlockableApps.DEFAULT_PACKAGES
 
-    private fun sp(ctx: Context): SharedPreferences =
-        ctx.applicationContext.getSharedPreferences(FILE, Context.MODE_PRIVATE)
-
-    fun registerChangeListener(
-        ctx: Context,
-        listener: SharedPreferences.OnSharedPreferenceChangeListener,
-    ) {
-        sp(ctx).registerOnSharedPreferenceChangeListener(listener)
-    }
-
-    fun unregisterChangeListener(
-        ctx: Context,
-        listener: SharedPreferences.OnSharedPreferenceChangeListener,
-    ) {
-        sp(ctx).unregisterOnSharedPreferenceChangeListener(listener)
-    }
-
-    fun getBlockedPackages(ctx: Context): Set<String> =
-        sp(ctx).getStringSet(KEY_BLOCKED, DEFAULT_BLOCKED) ?: DEFAULT_BLOCKED
-
-    fun setBlockedPackages(ctx: Context, pkgs: Set<String>) {
-        sp(ctx).edit().putStringSet(KEY_BLOCKED, pkgs).apply()
-    }
-
-    fun getApiUrl(ctx: Context): String =
-        sp(ctx).getString(KEY_API_URL, DEFAULT_API_URL) ?: DEFAULT_API_URL
-
-    fun setApiUrl(ctx: Context, url: String) {
-        sp(ctx).edit().putString(KEY_API_URL, url).apply()
-    }
-
-    fun getGlossaryApiUrl(ctx: Context): String =
-        sp(ctx).getString(KEY_GLOSSARY_API_URL, DEFAULT_GLOSSARY_API_URL) ?: DEFAULT_GLOSSARY_API_URL
-
-    fun setGlossaryApiUrl(ctx: Context, url: String) {
-        sp(ctx).edit().putString(KEY_GLOSSARY_API_URL, url).apply()
-    }
-
-    fun getLang(ctx: Context): String =
-        sp(ctx).getString(KEY_LANG, DEFAULT_LANG) ?: DEFAULT_LANG
-
-    fun setLang(ctx: Context, lang: String) {
-        sp(ctx).edit().putString(KEY_LANG, lang).apply()
-    }
-
-    fun setPendingUnlock(ctx: Context, pkg: String) {
-        sp(ctx).edit()
-            .putString(KEY_PENDING_UNLOCK_PKG, pkg)
-            .putLong(KEY_PENDING_UNLOCK_UNTIL, System.currentTimeMillis() + PENDING_UNLOCK_TTL_MS)
-            .apply()
-    }
-
-    fun consumePendingUnlock(ctx: Context, pkg: String): Boolean {
-        val s = sp(ctx)
-        val storedPkg = s.getString(KEY_PENDING_UNLOCK_PKG, null) ?: return false
-        val until = s.getLong(KEY_PENDING_UNLOCK_UNTIL, 0L)
-        val now = System.currentTimeMillis()
-        if (storedPkg != pkg || now > until) {
-            if (now > until) clearPendingUnlock(ctx)
-            return false
-        }
-        clearPendingUnlock(ctx)
-        return true
-    }
-
-    fun clearPendingUnlock(ctx: Context) {
-        sp(ctx).edit()
-            .remove(KEY_PENDING_UNLOCK_PKG)
-            .remove(KEY_PENDING_UNLOCK_UNTIL)
-            .apply()
-    }
-
-    fun setLastBlockedPackage(ctx: Context, pkg: String?) {
-        sp(ctx).edit().putString(KEY_LAST_BLOCKED_PKG, pkg).apply()
-    }
-
-    fun getLastBlockedPackage(ctx: Context): String? =
-        sp(ctx).getString(KEY_LAST_BLOCKED_PKG, null)
-
-    fun setLastFetch(ctx: Context, ms: Long) {
-        sp(ctx).edit().putLong(KEY_LAST_FETCH_MS, ms).apply()
-    }
-
-    fun getLastFetch(ctx: Context): Long =
-        sp(ctx).getLong(KEY_LAST_FETCH_MS, 0L)
-
-    fun setLastGlossaryFetch(ctx: Context, ms: Long) {
-        sp(ctx).edit().putLong(KEY_LAST_GLOSSARY_FETCH_MS, ms).apply()
-    }
-
-    fun getLastGlossaryFetch(ctx: Context): Long =
-        sp(ctx).getLong(KEY_LAST_GLOSSARY_FETCH_MS, 0L)
-
-    fun isGlossaryPushEnabled(ctx: Context): Boolean =
-        sp(ctx).getBoolean(KEY_GLOSSARY_PUSH_ENABLED, false)
-
-    fun setGlossaryPushEnabled(ctx: Context, enabled: Boolean) {
-        sp(ctx).edit().putBoolean(KEY_GLOSSARY_PUSH_ENABLED, enabled).apply()
-    }
-
-    fun getGlossaryPushIntervalMin(ctx: Context): Int =
-        sp(ctx).getInt(KEY_GLOSSARY_PUSH_INTERVAL_MIN, DEFAULT_GLOSSARY_PUSH_INTERVAL_MIN)
-
-    fun setGlossaryPushIntervalMin(ctx: Context, minutes: Int) {
-        sp(ctx).edit().putInt(KEY_GLOSSARY_PUSH_INTERVAL_MIN, minutes.coerceAtLeast(15)).apply()
-    }
-
-    fun getRecentGlossaryIds(ctx: Context): List<String> =
-        RecentQueue.decode(sp(ctx).getString(KEY_RECENT_GLOSSARY_IDS, null))
-
-    fun pushRecentGlossaryId(ctx: Context, id: String, maxSize: Int) {
-        val next = RecentQueue.push(getRecentGlossaryIds(ctx), id, maxSize)
-        sp(ctx).edit().putString(KEY_RECENT_GLOSSARY_IDS, RecentQueue.encode(next)).apply()
-    }
-
-    fun touchLastSeen(ctx: Context, pkg: String) {
-        sp(ctx).edit().putLong("$KEY_LAST_SEEN_PREFIX$pkg", System.currentTimeMillis()).apply()
-    }
-
-    fun isWithinSessionWindow(ctx: Context, pkg: String): Boolean {
-        val ls = sp(ctx).getLong("$KEY_LAST_SEEN_PREFIX$pkg", 0L)
-        if (ls == 0L) return false
-        return System.currentTimeMillis() - ls < SESSION_WINDOW_MS
-    }
-
-    fun clearLastSeen(ctx: Context, pkg: String) {
-        sp(ctx).edit().remove("$KEY_LAST_SEEN_PREFIX$pkg").apply()
-    }
-
-    fun getMaxInAppMinutes(ctx: Context): Int =
-        sp(ctx).getInt(KEY_MAX_IN_APP_MIN, DEFAULT_MAX_IN_APP_MIN)
-
-    fun setMaxInAppMinutes(ctx: Context, minutes: Int) {
-        sp(ctx).edit().putInt(KEY_MAX_IN_APP_MIN, minutes.coerceAtLeast(0)).apply()
-    }
-
-    fun getMaxInAppMs(ctx: Context): Long =
-        getMaxInAppMinutes(ctx).toLong() * 60_000L
-
-    fun getSessionStart(ctx: Context, pkg: String): Long =
-        sp(ctx).getLong("$KEY_SESSION_START_PREFIX$pkg", 0L)
-
-    fun setSessionStart(ctx: Context, pkg: String, ms: Long) {
-        sp(ctx).edit().putLong("$KEY_SESSION_START_PREFIX$pkg", ms).apply()
-    }
-
-    fun clearSessionStart(ctx: Context, pkg: String) {
-        sp(ctx).edit().remove("$KEY_SESSION_START_PREFIX$pkg").apply()
-    }
-
-    /** Null means "treat as all enabled" (never configured or empty selection). */
-    fun getEnabledDomainsOrNull(ctx: Context): Set<String>? {
-        val set = sp(ctx).getStringSet(KEY_ENABLED_DOMAINS, null) ?: return null
-        return set.ifEmpty { null }
-    }
-
-    fun setEnabledDomains(ctx: Context, domains: Set<String>) {
-        sp(ctx).edit().putStringSet(KEY_ENABLED_DOMAINS, domains).apply()
-    }
-
-    fun isIncludeOfficial(ctx: Context): Boolean =
-        sp(ctx).getBoolean(KEY_INCLUDE_OFFICIAL, true)
-
-    fun setIncludeOfficial(ctx: Context, included: Boolean) {
-        sp(ctx).edit().putBoolean(KEY_INCLUDE_OFFICIAL, included).apply()
-    }
-
-    fun isIncludeSynthetic(ctx: Context): Boolean =
-        sp(ctx).getBoolean(KEY_INCLUDE_SYNTHETIC, true)
-
-    fun setIncludeSynthetic(ctx: Context, included: Boolean) {
-        sp(ctx).edit().putBoolean(KEY_INCLUDE_SYNTHETIC, included).apply()
-    }
-
-    fun getRecentQuestionIds(ctx: Context): List<String> =
-        RecentQueue.decode(sp(ctx).getString(KEY_RECENT_QUESTION_IDS, null))
-
-    fun pushRecentQuestionId(ctx: Context, id: String, maxSize: Int) {
-        val next = RecentQueue.push(getRecentQuestionIds(ctx), id, maxSize)
-        sp(ctx).edit().putString(KEY_RECENT_QUESTION_IDS, RecentQueue.encode(next)).apply()
-    }
-
     data class QStat(val shown: Int, val correct: Int, val wrong: Int)
 
-    // Stats are read on every pickRandom (weighted sort) and written on every
-    // shown/answer. Parsing JSON on each call shows up in profiles, so we cache
-    // the parsed map in memory and write-through on every mutation. Single-process
-    // app — no IPC concerns.
-    @Volatile private var statsCache: Map<String, QStat>? = null
-    private val statsLock = Any()
+    @Volatile private var backend: PrefsBackend? = null
+    private val initLock = Any()
 
-    fun getStats(ctx: Context): Map<String, QStat> {
-        statsCache?.let { return it }
-        return synchronized(statsLock) {
-            statsCache ?: loadStatsFromDisk(ctx).also { statsCache = it }
+    /**
+     * Returns the active backend, lazily building a [DefaultPrefsBackend] from
+     * [ctx] when none was installed. [ctx] is only dereferenced on first call
+     * before a fake has been installed; once a fake or default exists it's
+     * ignored, which is what lets unit tests pass null after [installForTest].
+     */
+    private fun b(ctx: Context?): PrefsBackend {
+        backend?.let { return it }
+        val nonNull = checkNotNull(ctx) {
+            "Prefs accessed without a Context and no test backend installed"
+        }
+        return synchronized(initLock) {
+            backend ?: DefaultPrefsBackend(nonNull.applicationContext).also { backend = it }
         }
     }
 
-    private fun loadStatsFromDisk(ctx: Context): Map<String, QStat> =
-        StatsCodec.decode(sp(ctx).getString(KEY_QUESTION_STATS, null))
-
-    private fun saveStats(ctx: Context, stats: Map<String, QStat>) {
-        statsCache = stats
-        sp(ctx).edit().putString(KEY_QUESTION_STATS, StatsCodec.encode(stats)).apply()
+    @VisibleForTesting
+    fun installForTest(fake: PrefsBackend) {
+        backend = fake
     }
 
-    fun recordShown(ctx: Context, id: String) {
-        synchronized(statsLock) {
-            val stats = getStats(ctx).toMutableMap()
-            val s = stats[id] ?: QStat(0, 0, 0)
-            stats[id] = s.copy(shown = s.shown + 1)
-            saveStats(ctx, stats)
-        }
+    @VisibleForTesting
+    fun reset() {
+        backend = null
     }
 
-    fun recordAnswer(ctx: Context, id: String, correct: Boolean) {
-        synchronized(statsLock) {
-            val stats = getStats(ctx).toMutableMap()
-            val s = stats[id] ?: QStat(0, 0, 0)
-            stats[id] = if (correct) s.copy(correct = s.correct + 1) else s.copy(wrong = s.wrong + 1)
-            saveStats(ctx, stats)
-        }
-    }
+    fun registerChangeListener(
+        ctx: Context?,
+        listener: SharedPreferences.OnSharedPreferenceChangeListener,
+    ) = b(ctx).registerChangeListener(listener)
+
+    fun unregisterChangeListener(
+        ctx: Context?,
+        listener: SharedPreferences.OnSharedPreferenceChangeListener,
+    ) = b(ctx).unregisterChangeListener(listener)
+
+    fun getBlockedPackages(ctx: Context?): Set<String> = b(ctx).getBlockedPackages()
+    fun setBlockedPackages(ctx: Context?, pkgs: Set<String>) = b(ctx).setBlockedPackages(pkgs)
+
+    fun getApiUrl(ctx: Context?): String = b(ctx).getApiUrl()
+    fun setApiUrl(ctx: Context?, url: String) = b(ctx).setApiUrl(url)
+
+    fun getGlossaryApiUrl(ctx: Context?): String = b(ctx).getGlossaryApiUrl()
+    fun setGlossaryApiUrl(ctx: Context?, url: String) = b(ctx).setGlossaryApiUrl(url)
+
+    fun getLang(ctx: Context?): String = b(ctx).getLang()
+    fun setLang(ctx: Context?, lang: String) = b(ctx).setLang(lang)
+
+    fun setPendingUnlock(ctx: Context?, pkg: String) = b(ctx).setPendingUnlock(pkg)
+    fun consumePendingUnlock(ctx: Context?, pkg: String): Boolean = b(ctx).consumePendingUnlock(pkg)
+    fun clearPendingUnlock(ctx: Context?) = b(ctx).clearPendingUnlock()
+
+    fun setLastBlockedPackage(ctx: Context?, pkg: String?) = b(ctx).setLastBlockedPackage(pkg)
+    fun getLastBlockedPackage(ctx: Context?): String? = b(ctx).getLastBlockedPackage()
+
+    fun setLastFetch(ctx: Context?, ms: Long) = b(ctx).setLastFetch(ms)
+    fun getLastFetch(ctx: Context?): Long = b(ctx).getLastFetch()
+
+    fun setLastGlossaryFetch(ctx: Context?, ms: Long) = b(ctx).setLastGlossaryFetch(ms)
+    fun getLastGlossaryFetch(ctx: Context?): Long = b(ctx).getLastGlossaryFetch()
+
+    fun isGlossaryPushEnabled(ctx: Context?): Boolean = b(ctx).isGlossaryPushEnabled()
+    fun setGlossaryPushEnabled(ctx: Context?, enabled: Boolean) = b(ctx).setGlossaryPushEnabled(enabled)
+
+    fun getGlossaryPushIntervalMin(ctx: Context?): Int = b(ctx).getGlossaryPushIntervalMin()
+    fun setGlossaryPushIntervalMin(ctx: Context?, minutes: Int) =
+        b(ctx).setGlossaryPushIntervalMin(minutes)
+
+    fun getRecentGlossaryIds(ctx: Context?): List<String> = b(ctx).getRecentGlossaryIds()
+    fun pushRecentGlossaryId(ctx: Context?, id: String, maxSize: Int) =
+        b(ctx).pushRecentGlossaryId(id, maxSize)
+
+    fun touchLastSeen(ctx: Context?, pkg: String) = b(ctx).touchLastSeen(pkg)
+    fun isWithinSessionWindow(ctx: Context?, pkg: String): Boolean = b(ctx).isWithinSessionWindow(pkg)
+    fun clearLastSeen(ctx: Context?, pkg: String) = b(ctx).clearLastSeen(pkg)
+
+    fun getMaxInAppMinutes(ctx: Context?): Int = b(ctx).getMaxInAppMinutes()
+    fun setMaxInAppMinutes(ctx: Context?, minutes: Int) = b(ctx).setMaxInAppMinutes(minutes)
+    fun getMaxInAppMs(ctx: Context?): Long = b(ctx).getMaxInAppMs()
+
+    fun getSessionStart(ctx: Context?, pkg: String): Long = b(ctx).getSessionStart(pkg)
+    fun setSessionStart(ctx: Context?, pkg: String, ms: Long) = b(ctx).setSessionStart(pkg, ms)
+    fun clearSessionStart(ctx: Context?, pkg: String) = b(ctx).clearSessionStart(pkg)
+
+    fun getEnabledDomainsOrNull(ctx: Context?): Set<String>? = b(ctx).getEnabledDomainsOrNull()
+    fun setEnabledDomains(ctx: Context?, domains: Set<String>) = b(ctx).setEnabledDomains(domains)
+
+    fun isIncludeOfficial(ctx: Context?): Boolean = b(ctx).isIncludeOfficial()
+    fun setIncludeOfficial(ctx: Context?, included: Boolean) = b(ctx).setIncludeOfficial(included)
+
+    fun isIncludeSynthetic(ctx: Context?): Boolean = b(ctx).isIncludeSynthetic()
+    fun setIncludeSynthetic(ctx: Context?, included: Boolean) = b(ctx).setIncludeSynthetic(included)
+
+    fun getRecentQuestionIds(ctx: Context?): List<String> = b(ctx).getRecentQuestionIds()
+    fun pushRecentQuestionId(ctx: Context?, id: String, maxSize: Int) =
+        b(ctx).pushRecentQuestionId(id, maxSize)
+
+    fun getStats(ctx: Context?): Map<String, QStat> = b(ctx).getStats()
+    fun recordShown(ctx: Context?, id: String) = b(ctx).recordShown(id)
+    fun recordAnswer(ctx: Context?, id: String, correct: Boolean) = b(ctx).recordAnswer(id, correct)
 }
