@@ -110,7 +110,7 @@ class QuizActivity : ComponentActivity() {
 
 private sealed interface UiState {
     data object Loading : UiState
-    data class Error(@StringRes val messageRes: Int, val detail: String? = null) : UiState
+    data class Error(@param:StringRes val messageRes: Int, val detail: String? = null) : UiState
     data class Showing(
         val question: Question,
         // Maps the position the user sees -> the original index in question.options.
