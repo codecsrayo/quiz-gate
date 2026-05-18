@@ -2,7 +2,6 @@ package com.example.ask
 
 import android.content.Context
 import android.content.SharedPreferences
-import org.json.JSONObject
 
 object Prefs {
     private const val FILE = "quizgate_prefs"
@@ -145,18 +144,12 @@ object Prefs {
         sp(ctx).edit().putInt(KEY_GLOSSARY_PUSH_INTERVAL_MIN, minutes.coerceAtLeast(15)).apply()
     }
 
-    fun getRecentGlossaryIds(ctx: Context): List<String> {
-        val raw = sp(ctx).getString(KEY_RECENT_GLOSSARY_IDS, "") ?: ""
-        return if (raw.isEmpty()) emptyList() else raw.split('|')
-    }
+    fun getRecentGlossaryIds(ctx: Context): List<String> =
+        RecentQueue.decode(sp(ctx).getString(KEY_RECENT_GLOSSARY_IDS, null))
 
     fun pushRecentGlossaryId(ctx: Context, id: String, maxSize: Int) {
-        if (maxSize <= 0) return
-        val current = getRecentGlossaryIds(ctx).toMutableList()
-        current.remove(id)
-        current.add(id)
-        while (current.size > maxSize) current.removeAt(0)
-        sp(ctx).edit().putString(KEY_RECENT_GLOSSARY_IDS, current.joinToString("|")).apply()
+        val next = RecentQueue.push(getRecentGlossaryIds(ctx), id, maxSize)
+        sp(ctx).edit().putString(KEY_RECENT_GLOSSARY_IDS, RecentQueue.encode(next)).apply()
     }
 
     fun touchLastSeen(ctx: Context, pkg: String) {
@@ -218,18 +211,12 @@ object Prefs {
         sp(ctx).edit().putBoolean(KEY_INCLUDE_SYNTHETIC, included).apply()
     }
 
-    fun getRecentQuestionIds(ctx: Context): List<String> {
-        val raw = sp(ctx).getString(KEY_RECENT_QUESTION_IDS, "") ?: ""
-        return if (raw.isEmpty()) emptyList() else raw.split('|')
-    }
+    fun getRecentQuestionIds(ctx: Context): List<String> =
+        RecentQueue.decode(sp(ctx).getString(KEY_RECENT_QUESTION_IDS, null))
 
     fun pushRecentQuestionId(ctx: Context, id: String, maxSize: Int) {
-        if (maxSize <= 0) return
-        val current = getRecentQuestionIds(ctx).toMutableList()
-        current.remove(id)
-        current.add(id)
-        while (current.size > maxSize) current.removeAt(0)
-        sp(ctx).edit().putString(KEY_RECENT_QUESTION_IDS, current.joinToString("|")).apply()
+        val next = RecentQueue.push(getRecentQuestionIds(ctx), id, maxSize)
+        sp(ctx).edit().putString(KEY_RECENT_QUESTION_IDS, RecentQueue.encode(next)).apply()
     }
 
     data class QStat(val shown: Int, val correct: Int, val wrong: Int)
@@ -248,28 +235,12 @@ object Prefs {
         }
     }
 
-    private fun loadStatsFromDisk(ctx: Context): Map<String, QStat> {
-        val raw = sp(ctx).getString(KEY_QUESTION_STATS, null) ?: return emptyMap()
-        return runCatching {
-            val obj = JSONObject(raw)
-            val out = HashMap<String, QStat>(obj.length())
-            val it = obj.keys()
-            while (it.hasNext()) {
-                val k = it.next()
-                val v = obj.optJSONObject(k) ?: continue
-                out[k] = QStat(v.optInt("s", 0), v.optInt("c", 0), v.optInt("w", 0))
-            }
-            out
-        }.getOrDefault(emptyMap())
-    }
+    private fun loadStatsFromDisk(ctx: Context): Map<String, QStat> =
+        StatsCodec.decode(sp(ctx).getString(KEY_QUESTION_STATS, null))
 
     private fun saveStats(ctx: Context, stats: Map<String, QStat>) {
         statsCache = stats
-        val obj = JSONObject()
-        for ((k, v) in stats) {
-            obj.put(k, JSONObject().put("s", v.shown).put("c", v.correct).put("w", v.wrong))
-        }
-        sp(ctx).edit().putString(KEY_QUESTION_STATS, obj.toString()).apply()
+        sp(ctx).edit().putString(KEY_QUESTION_STATS, StatsCodec.encode(stats)).apply()
     }
 
     fun recordShown(ctx: Context, id: String) {
