@@ -113,6 +113,9 @@ private sealed interface UiState {
     data class Error(@StringRes val messageRes: Int, val detail: String? = null) : UiState
     data class Showing(
         val question: Question,
+        // Maps the position the user sees -> the original index in question.options.
+        // Lets us shuffle the visible order while keeping `answer`/`answers` valid.
+        val permutation: List<Int>,
         val selected: Set<Int>,
         val checked: Boolean,
     ) : UiState
@@ -134,46 +137,33 @@ private fun QuizGateScreen(
     var state by remember { mutableStateOf<UiState>(UiState.Loading) }
 
     fun pickRandom(): UiState {
-        if (pool.isEmpty()) {
-            return UiState.Error(R.string.quiz_err_no_cache)
+        val result = QuizSelector.pick(
+            pool = pool,
+            includeOfficial = Prefs.isIncludeOfficial(context),
+            includeSynthetic = Prefs.isIncludeSynthetic(context),
+            enabledDomains = Prefs.getEnabledDomainsOrNull(context),
+            recentIds = Prefs.getRecentQuestionIds(context).toSet(),
+            stats = Prefs.getStats(context),
+            optionsLang = Prefs.getLang(context),
+        )
+        return when (result) {
+            QuizSelector.Result.NoCache -> UiState.Error(R.string.quiz_err_no_cache)
+            QuizSelector.Result.NoSourceSelected -> UiState.Error(R.string.quiz_err_no_source)
+            QuizSelector.Result.NoSourceQuestions -> UiState.Error(R.string.quiz_err_no_source_questions)
+            QuizSelector.Result.NoDomain -> UiState.Error(R.string.quiz_err_no_domain)
+            is QuizSelector.Result.Picked -> {
+                val maxRecent = (pool.size / 2).coerceIn(5, 30)
+                Prefs.pushRecentQuestionId(context, result.question.id, maxRecent)
+                Prefs.recordShown(context, result.question.id)
+                Log.i("QuizGate", "pickRandom id=${result.question.id} perm=${result.permutation}")
+                UiState.Showing(
+                    result.question,
+                    permutation = result.permutation,
+                    selected = emptySet(),
+                    checked = false,
+                )
+            }
         }
-        val includeOfficial = Prefs.isIncludeOfficial(context)
-        val includeSynthetic = Prefs.isIncludeSynthetic(context)
-        if (!includeOfficial && !includeSynthetic) {
-            return UiState.Error(R.string.quiz_err_no_source)
-        }
-        val bySource = pool.filter { q ->
-            (q.synthetic && includeSynthetic) || (!q.synthetic && includeOfficial)
-        }
-        if (bySource.isEmpty()) {
-            return UiState.Error(R.string.quiz_err_no_source_questions)
-        }
-        val enabledDomains = Prefs.getEnabledDomainsOrNull(context)
-        val byDomain = if (enabledDomains == null) bySource
-            else bySource.filter { it.domain in enabledDomains }
-        if (byDomain.isEmpty()) {
-            return UiState.Error(R.string.quiz_err_no_domain)
-        }
-        val recent = Prefs.getRecentQuestionIds(context).toSet()
-        val candidates = byDomain.filterNot { it.id in recent }
-            .ifEmpty { byDomain }
-        val stats = Prefs.getStats(context)
-        fun weight(q: Question): Int {
-            val s = stats[q.id]
-            val wrong = s?.wrong ?: 0
-            val correct = s?.correct ?: 0
-            return (1 + 2 * wrong - correct).coerceAtLeast(1)
-        }
-        val totalWeight = candidates.sumOf { weight(it).toLong() }
-        var pick = (0 until totalWeight).random()
-        val chosen = candidates.first {
-            pick -= weight(it).toLong()
-            pick < 0L
-        }
-        val maxRecent = (pool.size / 2).coerceIn(5, 30)
-        Prefs.pushRecentQuestionId(context, chosen.id, maxRecent)
-        Prefs.recordShown(context, chosen.id)
-        return UiState.Showing(chosen, selected = emptySet(), checked = false)
     }
 
     LaunchedEffect(Unit) {
@@ -269,7 +259,8 @@ private fun QuizGateScreen(
                         state = s.copy(selected = next)
                     },
                     onCheck = {
-                        val correct = s.selected == s.question.correctAnswers()
+                        val selectedOriginal = s.selected.mapTo(HashSet()) { s.permutation[it] }
+                        val correct = selectedOriginal == s.question.correctAnswers()
                         Prefs.recordAnswer(context, s.question.id, correct)
                         state = s.copy(checked = true)
                     },
@@ -282,7 +273,8 @@ private fun QuizGateScreen(
         Row(modifier = Modifier.fillMaxWidth()) {
             val current = state as? UiState.Showing
             val isCorrect = current != null && current.checked &&
-                current.selected == current.question.correctAnswers()
+                current.selected.mapTo(HashSet()) { current.permutation[it] } ==
+                current.question.correctAnswers()
             if (practiceMode) {
                 OutlinedButton(
                     onClick = onCancel,
@@ -327,7 +319,12 @@ private fun QuestionView(
     val q = state.question
     val correct = q.correctAnswers()
     val stmt = q.statement(lang)
-    Log.i("QuizGate", "QuestionView render id=${q.id} lang=$lang qKeys=${q.q.keys} stmtPreview='${stmt.take(40)}'")
+    val rawOpts = q.optionsFor(lang)
+    // Defensive: if the per-language option list mismatches the permutation length
+    // (data shape changed mid-quiz), fall back to identity ordering.
+    val perm = if (state.permutation.size == rawOpts.size) state.permutation
+        else rawOpts.indices.toList()
+    Log.i("QuizGate", "QuestionView render id=${q.id} lang=$lang qKeys=${q.q.keys} stmtPreview='${stmt.take(40)}' perm=$perm")
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -355,10 +352,10 @@ private fun QuestionView(
         val (successBg, successFg) = successColors()
         val (errorBg, errorFg) = errorColors()
 
-        val opts = q.optionsFor(lang)
-        opts.forEachIndexed { idx, opt ->
+        perm.forEachIndexed { idx, originalIdx ->
+            val opt = rawOpts[originalIdx]
             val isSelected = idx in state.selected
-            val isCorrectOpt = idx in correct
+            val isCorrectOpt = originalIdx in correct
             val bg: Color = when {
                 state.checked && isCorrectOpt -> successBg
                 state.checked && isSelected && !isCorrectOpt -> errorBg
@@ -420,7 +417,7 @@ private fun QuestionView(
                 )
             }
         } else {
-            val isCorrect = state.selected == correct
+            val isCorrect = state.selected.mapTo(HashSet()) { perm[it] } == correct
             Surface(
                 shape = RoundedCornerShape(8.dp),
                 color = if (isCorrect) successBg else errorBg,
