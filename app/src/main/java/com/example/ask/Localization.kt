@@ -19,7 +19,6 @@ object LocaleManager {
     /** Build a context whose resources resolve to [lang]. */
     fun wrap(base: Context, lang: String = Prefs.getLang(base)): Context {
         val locale = Locale.forLanguageTag(lang)
-        Locale.setDefault(locale)
         val config = Configuration(base.resources.configuration)
         config.setLocale(locale)
         return base.createConfigurationContext(config)
