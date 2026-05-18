@@ -41,7 +41,6 @@ class QuizSelectorTest {
             enabledDomains = null,
             recentIds = emptySet(),
             stats = emptyMap(),
-            optionsLang = "es",
         )
         assertEquals(QuizSelector.Result.NoCache, r)
     }
@@ -55,7 +54,6 @@ class QuizSelectorTest {
             enabledDomains = null,
             recentIds = emptySet(),
             stats = emptyMap(),
-            optionsLang = "es",
         )
         assertEquals(QuizSelector.Result.NoSourceSelected, r)
     }
@@ -70,7 +68,6 @@ class QuizSelectorTest {
             enabledDomains = null,
             recentIds = emptySet(),
             stats = emptyMap(),
-            optionsLang = "es",
             random = Random(0),
         ) as QuizSelector.Result.Picked
         assertEquals("a", r.question.id)
@@ -86,7 +83,6 @@ class QuizSelectorTest {
             enabledDomains = null,
             recentIds = emptySet(),
             stats = emptyMap(),
-            optionsLang = "es",
             random = Random(0),
         ) as QuizSelector.Result.Picked
         assertEquals("b", r.question.id)
@@ -103,7 +99,6 @@ class QuizSelectorTest {
             enabledDomains = null,
             recentIds = emptySet(),
             stats = emptyMap(),
-            optionsLang = "es",
         )
         assertEquals(QuizSelector.Result.NoSourceQuestions, r)
     }
@@ -119,8 +114,7 @@ class QuizSelectorTest {
                 enabledDomains = setOf("d2"),
                 recentIds = emptySet(),
                 stats = emptyMap(),
-                optionsLang = "es",
-                random = Random(seed.toLong()),
+                    random = Random(seed.toLong()),
             ) as QuizSelector.Result.Picked
             assertEquals("b", r.question.id)
         }
@@ -136,7 +130,6 @@ class QuizSelectorTest {
             enabledDomains = setOf("dX"),
             recentIds = emptySet(),
             stats = emptyMap(),
-            optionsLang = "es",
         )
         assertEquals(QuizSelector.Result.NoDomain, r)
     }
@@ -153,8 +146,7 @@ class QuizSelectorTest {
                 enabledDomains = null,
                 recentIds = emptySet(),
                 stats = emptyMap(),
-                optionsLang = "es",
-                random = Random(seed.toLong()),
+                    random = Random(seed.toLong()),
             ) as QuizSelector.Result.Picked
             seen += r.question.id
         }
@@ -173,8 +165,7 @@ class QuizSelectorTest {
                 enabledDomains = null,
                 recentIds = setOf("a"),
                 stats = emptyMap(),
-                optionsLang = "es",
-                random = Random(seed.toLong()),
+                    random = Random(seed.toLong()),
             ) as QuizSelector.Result.Picked
             seen += r.question.id
         }
@@ -194,7 +185,6 @@ class QuizSelectorTest {
             enabledDomains = null,
             recentIds = setOf("a", "b"),
             stats = emptyMap(),
-            optionsLang = "es",
             random = Random(0),
         )
         assertTrue(r is QuizSelector.Result.Picked)
@@ -219,8 +209,7 @@ class QuizSelectorTest {
                 enabledDomains = null,
                 recentIds = emptySet(),
                 stats = stats,
-                optionsLang = "es",
-                random = Random(seed.toLong()),
+                    random = Random(seed.toLong()),
             ) as QuizSelector.Result.Picked
             counts.merge(r.question.id, 1) { a, _ -> a + 1 }
         }
@@ -241,7 +230,6 @@ class QuizSelectorTest {
             enabledDomains = null,
             recentIds = emptySet(),
             stats = stats,
-            optionsLang = "es",
             random = Random(0),
         )
         assertTrue(r is QuizSelector.Result.Picked)
@@ -259,8 +247,7 @@ class QuizSelectorTest {
                 enabledDomains = null,
                 recentIds = emptySet(),
                 stats = emptyMap(),
-                optionsLang = "es",
-                random = Random(seed.toLong()),
+                    random = Random(seed.toLong()),
             ) as QuizSelector.Result.Picked
             assertEquals(5, r.permutation.size)
         }
@@ -277,8 +264,7 @@ class QuizSelectorTest {
                 enabledDomains = null,
                 recentIds = emptySet(),
                 stats = emptyMap(),
-                optionsLang = "es",
-                random = Random(seed.toLong()),
+                    random = Random(seed.toLong()),
             ) as QuizSelector.Result.Picked
             assertEquals((0 until 6).toSet(), r.permutation.toSet())
             assertEquals(6, r.permutation.distinct().size)
@@ -297,8 +283,7 @@ class QuizSelectorTest {
                 enabledDomains = null,
                 recentIds = emptySet(),
                 stats = emptyMap(),
-                optionsLang = "es",
-                random = Random(seed.toLong()),
+                    random = Random(seed.toLong()),
             ) as QuizSelector.Result.Picked
             if (r.permutation != (0 until 5).toList()) sawShuffled = true
         }
@@ -317,7 +302,6 @@ class QuizSelectorTest {
             enabledDomains = null,
             recentIds = emptySet(),
             stats = emptyMap(),
-            optionsLang = "es",
             random = Random(7),
         ) as QuizSelector.Result.Picked
 
@@ -344,7 +328,6 @@ class QuizSelectorTest {
             enabledDomains = null,
             recentIds = emptySet(),
             stats = emptyMap(),
-            optionsLang = "es",
             random = Random(42),
         ) as QuizSelector.Result.Picked
 
@@ -364,7 +347,6 @@ class QuizSelectorTest {
             enabledDomains = null,
             recentIds = emptySet(),
             stats = emptyMap(),
-            optionsLang = "es",
             random = Random(3),
         ) as QuizSelector.Result.Picked
 

@@ -144,7 +144,6 @@ private fun QuizGateScreen(
             enabledDomains = Prefs.getEnabledDomainsOrNull(context),
             recentIds = Prefs.getRecentQuestionIds(context).toSet(),
             stats = Prefs.getStats(context),
-            optionsLang = Prefs.getLang(context),
         )
         return when (result) {
             QuizSelector.Result.NoCache -> UiState.Error(R.string.quiz_err_no_cache)

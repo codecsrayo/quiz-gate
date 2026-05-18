@@ -26,7 +26,6 @@ object QuizSelector {
         enabledDomains: Set<String>?,
         recentIds: Set<String>,
         stats: Map<String, Prefs.QStat>,
-        optionsLang: String,
         random: Random = Random.Default,
     ): Result {
         if (pool.isEmpty()) return Result.NoCache
@@ -50,7 +49,7 @@ object QuizSelector {
             remaining -= weight(it, stats)
             remaining < 0L
         }
-        val nOpts = chosen.optionsFor(optionsLang).size
+        val nOpts = chosen.options.values.firstOrNull()?.size ?: 0
         val perm = (0 until nOpts).shuffled(random)
         return Result.Picked(chosen, perm)
     }
