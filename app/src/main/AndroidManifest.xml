@@ -45,6 +45,7 @@
             android:exported="false"
             android:launchMode="singleTask"
             android:taskAffinity="com.codecsrayo.quizgate.quiz"
+            android:excludeFromRecents="true"
             android:showOnLockScreen="false"
             android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|smallestScreenSize|navigation|uiMode"
             android:theme="@style/Theme.Ask.Fullscreen" />

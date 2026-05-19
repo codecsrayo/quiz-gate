@@ -314,6 +314,13 @@ class BlockerAccessibilityService : AccessibilityService() {
         if (pkg == "com.android.systemui") return true
         if (pkg.startsWith("com.miui.systemui")) return true
         if (pkg.startsWith("miui.systemui")) return true
+        // Screenshot tools surface as foreground apps but are momentary overlays —
+        // treating them as system avoids resetting the active blocked-app session
+        // when the user captures the quiz (or any blocked app) screen.
+        if (pkg == "com.miui.screenshot") return true
+        if (pkg == "com.android.systemui.screenshot") return true
+        if (pkg == "com.samsung.android.app.smartcapture") return true
+        if (pkg.endsWith(".screenshot")) return true
         return false
     }
 
