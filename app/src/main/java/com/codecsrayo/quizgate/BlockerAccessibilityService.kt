@@ -220,16 +220,23 @@ class BlockerAccessibilityService : AccessibilityService() {
         // hosting BottomSheetDialogFragments, etc.): bypass quiz and open session.
         //
         // Signal 1 — explicit match against known share-receiver activity classes.
-        // Signal 2 — className that is NOT a class inside the app's own package.
-        //   Real launcher entries report the activity FQN (e.g. com.whatsapp.home.ui.HomeActivity).
-        //   Share-target dialogs report the root view class (e.g. android.widget.FrameLayout)
-        //   because the window is a Dialog/PopupWindow, not an Activity. Re-entering an
-        //   app the user is already in is filtered earlier by the `pkg == prev` short-circuit,
-        //   so this heuristic only fires on cross-app transitions.
+        // Signal 2 — className reports a generic view/dialog class instead of an
+        //   Activity FQN. Real activity launches report e.g.
+        //   `com.whatsapp.home.ui.HomeActivity` or `com.instagram.mainactivity.InstagramMainActivity`.
+        //   Share-target dialogs report the root view's class (e.g.
+        //   `android.widget.FrameLayout`) because the window is a Dialog/PopupWindow,
+        //   not an Activity. Matching against the framework view namespaces avoids
+        //   cross-package false positives (Instagram's applicationId
+        //   `com.instagram.android` doesn't match its `com.instagram.mainactivity.*`
+        //   activity classes).
         val className = event.className?.toString()
+        val isDialogOrPopup = className != null && (
+            className.startsWith("android.widget.") ||
+                className.startsWith("android.view.") ||
+                className.startsWith("androidx.")
+            )
         val isExternalEntry = className != null && (
-            className in EXTERNAL_ENTRY_CLASSES ||
-                !className.startsWith("$pkg.")
+            className in EXTERNAL_ENTRY_CLASSES || isDialogOrPopup
             )
         if (isExternalEntry) {
             Log.i(TAG, "external entry $className for $pkg → bypass quiz, open session")
