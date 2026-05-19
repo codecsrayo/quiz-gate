@@ -9,6 +9,7 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
+import android.view.inputmethod.InputMethodManager
 
 private val IN_APP_TIMER_EXEMPT = setOf(
     "com.whatsapp",
@@ -23,12 +24,60 @@ private val TRANSIENT_PKGS = setOf(
     "com.google.android.apps.nexuslauncher",
     "com.android.launcher",
     "com.android.launcher3",
+    // Share-sheet / intent resolvers (treat like launcher: pass-through, don't reset session)
+    "com.android.intentresolver",
+    "com.google.android.intentresolver",
+    "com.miui.intentresolver",
+)
+
+// Keyboards that don't follow the `.ime` suffix convention. The InputMethodManager
+// query at service start is the primary source; this list is a fallback for devices
+// where the IME isn't listed as "enabled" yet or for IMEs installed mid-session.
+private val KNOWN_IME_PKGS = setOf(
+    "com.google.android.inputmethod.latin",      // Gboard
+    "com.google.android.inputmethod.pinyin",     // Google Pinyin
+    "com.google.android.inputmethod.japanese",   // Gboard JP
+    "com.google.android.inputmethod.korean",     // Gboard KR
+    "com.touchtype.swiftkey",                    // Microsoft SwiftKey
+    "com.touchtype.swiftkey.beta",
+    "com.samsung.android.honeyboard",            // Samsung Keyboard
+    "com.sec.android.inputmethod",               // Samsung legacy
+    "com.miui.securityinputmethod",              // MIUI secure input
+    "com.iflytek.inputmethod.miui",              // HyperOS keyboard (iFlytek-based)
+    "com.baidu.input_mi",                        // Baidu (MIUI variant)
+    "com.sohu.inputmethod.sogou.xiaomi",         // Sogou (Xiaomi variant)
+    "com.cootek.smartinputv5",                   // TouchPal
+    "com.syntellia.fleksy.keyboard",             // Fleksy
+    "com.grammarly.android.keyboard",            // Grammarly
+    "com.menny.android.anysoftkeyboard",         // AnySoftKeyboard
+    "com.klye.ime.latin",                        // Multiling O
+    "com.lge.ime",                               // LG
+    "kik.android.kikkeyboard",                   // Kika
+)
+
+// Activity classes that indicate the blocked app was opened to receive an external
+// intent (share-sheet target, system handler, etc.) — bypass quiz so the user can
+// complete the share without interruption. Add to this list when logcat shows a new
+// share-receiver className firing the quiz.
+private val EXTERNAL_ENTRY_CLASSES = setOf(
+    // WhatsApp share targets
+    "com.whatsapp.ContactPicker",
+    "com.whatsapp.contact.picker.ContactPicker",
+    "com.whatsapp.gallerypicker.MediaPicker",
+    // Facebook share targets
+    "com.facebook.composer.shareintent.ImplicitShareIntentHandler",
+    "com.facebook.composer.shareintent.ImplicitShareIntentHandlerDefaultAlias",
+    "com.facebook.composer.shareintent.ShareIntentHandler",
+    // Instagram share targets
+    "com.instagram.share.handleractivity.ShareHandlerActivity",
+    "com.instagram.direct.share.handler.DirectShareHandlerActivity",
 )
 
 private fun isTransient(pkg: String): Boolean {
     if (pkg in TRANSIENT_PKGS) return true
     if (pkg.startsWith("com.miui.systemui")) return true
     if (pkg.endsWith(".launcher") || pkg.endsWith(".launcher3")) return true
+    if (pkg.endsWith(".intentresolver")) return true
     return false
 }
 
@@ -40,6 +89,10 @@ class BlockerAccessibilityService : AccessibilityService() {
     // Read on every TYPE_WINDOW_STATE_CHANGED. Cached here and refreshed via the
     // SharedPreferences change listener below so we don't hit disk per event.
     @Volatile private var blockedCache: Set<String> = emptySet()
+
+    // Union of system-enabled IMEs and the hardcoded fallback. Refreshed on connect
+    // and lazily on misses so keyboard switches mid-session are picked up.
+    @Volatile private var imeCache: Set<String> = KNOWN_IME_PKGS
 
     private val prefsListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
         if (key == null || key == Prefs.KEY_BLOCKED) {
@@ -53,9 +106,28 @@ class BlockerAccessibilityService : AccessibilityService() {
     override fun onServiceConnected() {
         super.onServiceConnected()
         Log.i(TAG, "AccessibilityService connected")
-        blockedCache = Prefs.getBlockedPackages(this)
-        Prefs.registerChangeListener(this, prefsListener)
-        WatchdogService.start(this)
+        runCatching { blockedCache = Prefs.getBlockedPackages(this) }
+            .onFailure { Log.e(TAG, "load blocked packages failed", it) }
+        runCatching { imeCache = loadImePackages() }
+            .onFailure { Log.e(TAG, "load IME packages failed", it) }
+        runCatching { Prefs.registerChangeListener(this, prefsListener) }
+            .onFailure { Log.e(TAG, "register prefs listener failed", it) }
+        runCatching { WatchdogService.start(this) }
+            .onFailure { Log.e(TAG, "start watchdog failed", it) }
+    }
+
+    private fun loadImePackages(): Set<String> {
+        val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
+            ?: return KNOWN_IME_PKGS
+        val enabled = runCatching {
+            imm.enabledInputMethodList.orEmpty().mapNotNull { it.packageName }
+        }.getOrElse { emptyList() }
+        return KNOWN_IME_PKGS + enabled
+    }
+
+    private fun isIme(pkg: String): Boolean {
+        if (pkg.endsWith(".ime")) return true
+        return pkg in imeCache
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
@@ -144,6 +216,29 @@ class BlockerAccessibilityService : AccessibilityService() {
             return
         }
 
+        // External-entry windows (share-target dialogs, popups, transparent activities
+        // hosting BottomSheetDialogFragments, etc.): bypass quiz and open session.
+        //
+        // Signal 1 — explicit match against known share-receiver activity classes.
+        // Signal 2 — className that is NOT a class inside the app's own package.
+        //   Real launcher entries report the activity FQN (e.g. com.whatsapp.home.ui.HomeActivity).
+        //   Share-target dialogs report the root view class (e.g. android.widget.FrameLayout)
+        //   because the window is a Dialog/PopupWindow, not an Activity. Re-entering an
+        //   app the user is already in is filtered earlier by the `pkg == prev` short-circuit,
+        //   so this heuristic only fires on cross-app transitions.
+        val className = event.className?.toString()
+        val isExternalEntry = className != null && (
+            className in EXTERNAL_ENTRY_CLASSES ||
+                !className.startsWith("$pkg.")
+            )
+        if (isExternalEntry) {
+            Log.i(TAG, "external entry $className for $pkg → bypass quiz, open session")
+            Prefs.touchLastSeen(this, pkg)
+            Prefs.setSessionStart(this, pkg, System.currentTimeMillis())
+            scheduleInAppTimeout(pkg)
+            return
+        }
+
         // First entry / expired session: fresh quiz
         val now = System.currentTimeMillis()
         if (now - lastLaunchMs < 1500L) {
@@ -151,7 +246,7 @@ class BlockerAccessibilityService : AccessibilityService() {
             return
         }
         lastLaunchMs = now
-        Log.i(TAG, "blocking $pkg → launching QuizActivity")
+        Log.i(TAG, "blocking $pkg (class=$className) → launching QuizActivity")
         triggerQuiz(pkg, resetSession = true)
     }
 
@@ -207,7 +302,7 @@ class BlockerAccessibilityService : AccessibilityService() {
     }
 
     private fun isSystemPackage(pkg: String): Boolean {
-        if (pkg.endsWith(".ime")) return true
+        if (isIme(pkg)) return true
         if (pkg == "android") return true
         if (pkg == "com.android.systemui") return true
         if (pkg.startsWith("com.miui.systemui")) return true
