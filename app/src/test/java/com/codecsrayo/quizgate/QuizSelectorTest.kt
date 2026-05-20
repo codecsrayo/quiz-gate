@@ -357,4 +357,120 @@ class QuizSelectorTest {
         val mappedBack = setOf(r.permutation[wrongDisplay])
         assertFalse(mappedBack == correct)
     }
+
+    @Test
+    fun novedad_mode_picks_only_unseen_questions() {
+        val pool = listOf(q("a"), q("b"))
+        val stats = mapOf("b" to Prefs.QStat(shown = 5, correct = 2, wrong = 3))
+        repeat(50) { seed ->
+            val r = QuizSelector.pick(
+                pool = pool,
+                includeOfficial = true,
+                includeSynthetic = true,
+                enabledDomains = null,
+                recentIds = emptySet(),
+                stats = stats,
+                mode = QuizMode.Mode.Novedad,
+                random = Random(seed.toLong()),
+            ) as QuizSelector.Result.Picked
+            assertEquals("a", r.question.id)
+        }
+    }
+
+    @Test
+    fun refuerzo_mode_picks_only_seen_questions() {
+        val pool = listOf(q("a"), q("b"))
+        val stats = mapOf("b" to Prefs.QStat(shown = 5, correct = 2, wrong = 3))
+        repeat(50) { seed ->
+            val r = QuizSelector.pick(
+                pool = pool,
+                includeOfficial = true,
+                includeSynthetic = true,
+                enabledDomains = null,
+                recentIds = emptySet(),
+                stats = stats,
+                mode = QuizMode.Mode.Refuerzo,
+                random = Random(seed.toLong()),
+            ) as QuizSelector.Result.Picked
+            assertEquals("b", r.question.id)
+        }
+    }
+
+    @Test
+    fun novedad_mode_falls_back_to_refuerzo_when_no_unseen_left() {
+        val pool = listOf(q("a"), q("b"))
+        val stats = mapOf(
+            "a" to Prefs.QStat(shown = 3, correct = 1, wrong = 2),
+            "b" to Prefs.QStat(shown = 5, correct = 2, wrong = 3),
+        )
+        val r = QuizSelector.pick(
+            pool = pool,
+            includeOfficial = true,
+            includeSynthetic = true,
+            enabledDomains = null,
+            recentIds = emptySet(),
+            stats = stats,
+            mode = QuizMode.Mode.Novedad,
+            random = Random(0),
+        )
+        assertTrue(r is QuizSelector.Result.Picked)
+        assertTrue((r as QuizSelector.Result.Picked).question.id in setOf("a", "b"))
+    }
+
+    @Test
+    fun refuerzo_mode_falls_back_to_novedad_when_stats_empty() {
+        val pool = listOf(q("a"), q("b"))
+        val r = QuizSelector.pick(
+            pool = pool,
+            includeOfficial = true,
+            includeSynthetic = true,
+            enabledDomains = null,
+            recentIds = emptySet(),
+            stats = emptyMap(),
+            mode = QuizMode.Mode.Refuerzo,
+            random = Random(0),
+        )
+        assertTrue(r is QuizSelector.Result.Picked)
+        assertTrue((r as QuizSelector.Result.Picked).question.id in setOf("a", "b"))
+    }
+
+    @Test
+    fun default_mode_parameter_keeps_legacy_behavior_when_no_stats() {
+        // No mode specified -> defaults to Refuerzo. With empty stats, the refuerzo
+        // bucket is empty so it falls back to novedad (the whole pool).
+        val pool = listOf(q("a"), q("b"))
+        val r = QuizSelector.pick(
+            pool = pool,
+            includeOfficial = true,
+            includeSynthetic = true,
+            enabledDomains = null,
+            recentIds = emptySet(),
+            stats = emptyMap(),
+            random = Random(0),
+        )
+        assertTrue(r is QuizSelector.Result.Picked)
+        assertTrue((r as QuizSelector.Result.Picked).question.id in setOf("a", "b"))
+    }
+
+    @Test
+    fun mode_partition_respects_recents_exclusion() {
+        val pool = listOf(q("seen-a"), q("seen-b"))
+        val stats = mapOf(
+            "seen-a" to Prefs.QStat(shown = 1, correct = 0, wrong = 1),
+            "seen-b" to Prefs.QStat(shown = 1, correct = 0, wrong = 1),
+        )
+        repeat(50) { seed ->
+            val r = QuizSelector.pick(
+                pool = pool,
+                includeOfficial = true,
+                includeSynthetic = true,
+                enabledDomains = null,
+                recentIds = setOf("seen-a"),
+                stats = stats,
+                mode = QuizMode.Mode.Refuerzo,
+                random = Random(seed.toLong()),
+            ) as QuizSelector.Result.Picked
+            assertEquals("seen-b", r.question.id)
+        }
+    }
 }

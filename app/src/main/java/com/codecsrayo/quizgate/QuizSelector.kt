@@ -26,6 +26,7 @@ object QuizSelector {
         enabledDomains: Set<String>?,
         recentIds: Set<String>,
         stats: Map<String, Prefs.QStat>,
+        mode: QuizMode.Mode = QuizMode.Mode.Refuerzo,
         random: Random = Random.Default,
     ): Result {
         if (pool.isEmpty()) return Result.NoCache
@@ -40,8 +41,15 @@ object QuizSelector {
             else bySource.filter { it.domain in enabledDomains }
         if (byDomain.isEmpty()) return Result.NoDomain
 
-        val candidates = byDomain.filterNot { it.id in recentIds }
-            .ifEmpty { byDomain }
+        val (novedad, refuerzo) = byDomain.partition { (stats[it.id]?.shown ?: 0) == 0 }
+        val primary = if (mode == QuizMode.Mode.Novedad) novedad else refuerzo
+        val fallback = if (mode == QuizMode.Mode.Novedad) refuerzo else novedad
+        val byMode = primary.ifEmpty { fallback }
+        // byMode is guaranteed non-empty here: byDomain was non-empty (we just
+        // returned NoDomain otherwise) and the partition + fallback covers it.
+
+        val candidates = byMode.filterNot { it.id in recentIds }
+            .ifEmpty { byMode }
 
         val totalWeight = candidates.sumOf { weight(it, stats) }
         var remaining = random.nextLong(totalWeight)
