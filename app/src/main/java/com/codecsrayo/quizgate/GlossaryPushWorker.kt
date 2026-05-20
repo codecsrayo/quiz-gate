@@ -41,8 +41,16 @@ class GlossaryPushWorker(
         }
 
         val recent = Prefs.getRecentGlossaryIds(ctx).toSet()
-        val candidates = terms.filterNot { it.symbol in recent }.ifEmpty { terms }
-        val chosen = candidates.random()
+        val questionsById = QuizRepository(ctx).loadCached().associateBy { it.id }
+        val failingDomains = QuizDomainStats.failingDomains(
+            stats = Prefs.getStats(ctx),
+            questionsById = questionsById,
+        )
+        val chosen = GlossarySelector.pick(
+            terms = terms,
+            recentSymbols = recent,
+            failingDomains = failingDomains,
+        )
 
         val maxRecent = (terms.size / 2).coerceIn(5, 50)
         Prefs.pushRecentGlossaryId(ctx, chosen.symbol, maxRecent)
