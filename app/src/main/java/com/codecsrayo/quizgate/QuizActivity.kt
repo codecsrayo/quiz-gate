@@ -22,6 +22,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -213,19 +216,7 @@ private fun QuizGateScreen(
                 modifier = Modifier.weight(1f),
             )
             mode?.let { m ->
-                AssistChip(
-                    onClick = {},
-                    label = {
-                        Text(
-                            stringResource(
-                                when (m) {
-                                    QuizMode.Mode.Novedad -> R.string.quiz_mode_novelty
-                                    QuizMode.Mode.Refuerzo -> R.string.quiz_mode_reinforcement
-                                }
-                            )
-                        )
-                    },
-                )
+                ModeIndicator(m)
                 Spacer(Modifier.width(8.dp))
             }
             FilterChip(
@@ -482,6 +473,33 @@ private fun QuestionView(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun ModeIndicator(mode: QuizMode.Mode) {
+    val (labelRes, accent) = when (mode) {
+        QuizMode.Mode.Novedad -> R.string.quiz_mode_novelty to Color(0xFF66BB6A)
+        QuizMode.Mode.Refuerzo -> R.string.quiz_mode_reinforcement to Color(0xFFFFA726)
+    }
+    Surface(
+        shape = RoundedCornerShape(8.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        modifier = Modifier.drawWithContent {
+            drawContent()
+            val barHeight = 2.5.dp.toPx()
+            drawRect(
+                color = accent,
+                topLeft = Offset(0f, size.height - barHeight),
+                size = Size(size.width, barHeight),
+            )
+        },
+    ) {
+        Text(
+            text = stringResource(labelRes),
+            style = MaterialTheme.typography.labelMedium,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+        )
     }
 }
 
