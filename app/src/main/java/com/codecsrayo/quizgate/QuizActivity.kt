@@ -1,5 +1,6 @@
 package com.codecsrayo.quizgate
 
+import android.app.ActivityManager
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
@@ -45,6 +46,17 @@ class QuizActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         val practice = intent?.getBooleanExtra(EXTRA_PRACTICE_MODE, false) ?: false
         Log.i(TAG, "QuizActivity onCreate practice=$practice")
+
+        // Manifest defaults the task to excludeFromRecents=true so the gate
+        // can't be dismissed via the recents UI. Practice mode is voluntary
+        // study and must allow normal multitasking — flip the flag per launch
+        // since singleTask reuses the same task across modes.
+        runCatching {
+            val am = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+            am.appTasks
+                .firstOrNull { it.taskInfo.taskId == taskId }
+                ?.setExcludeFromRecents(!practice)
+        }.onFailure { Log.w(TAG, "setExcludeFromRecents failed", it) }
 
         WatchdogService.start(this)
 
