@@ -84,6 +84,7 @@ private fun isTransient(pkg: String): Boolean {
 class BlockerAccessibilityService : AccessibilityService() {
 
     @Volatile private var lastForegroundPkg: String? = null
+    @Volatile private var lastForegroundChangeMs: Long = 0L
     @Volatile private var lastLaunchMs: Long = 0L
 
     // Read on every TYPE_WINDOW_STATE_CHANGED. Cached here and refreshed via the
@@ -140,16 +141,25 @@ class BlockerAccessibilityService : AccessibilityService() {
 
         val prev = lastForegroundPkg
         if (pkg == prev) return
+        val prevAgeMs = if (lastForegroundChangeMs > 0L)
+            System.currentTimeMillis() - lastForegroundChangeMs
+        else
+            Long.MAX_VALUE
         lastForegroundPkg = pkg
+        lastForegroundChangeMs = System.currentTimeMillis()
 
         val blocked = blockedCache
 
         // Leaving a blocked app:
         //  - To transient (launcher/systemui/recents) → keep session alive (touch lastSeen)
-        //  - To any real app (own app, blocked or not) → end session immediately
+        //  - To another blocked app → also keep session alive: the transition is most
+        //    likely a deep-link share (e.g. Facebook → WhatsApp via whatsapp://send)
+        //    rather than a deliberate manual switch, which would have routed through
+        //    the launcher first.
+        //  - To any other real app → end session immediately
         if (prev != null && prev != pkg && prev in blocked) {
             cancelTimeout()
-            if (isTransient(pkg) || pkg == packageName) {
+            if (isTransient(pkg) || pkg == packageName || pkg in blocked) {
                 Prefs.touchLastSeen(this, prev)
             } else {
                 Log.i(TAG, "leaving $prev → real app $pkg, ending session")
@@ -246,6 +256,21 @@ class BlockerAccessibilityService : AccessibilityService() {
             return
         }
 
+        // Direct blocked → blocked handoff (e.g. Facebook share-link opens WhatsApp's
+        // HomeActivity, indistinguishable from a launcher tap by className alone).
+        // If prev is also a blocked app AND was foreground recently, the user couldn't
+        // have manually navigated through launcher/recents in between — it's an
+        // app-initiated handoff. Bypass quiz. The time bound prevents stale-prev cases
+        // (screen-off then app launched via lock-screen notification, etc.) from
+        // triggering this path.
+        if (prev != null && prev in blocked && prevAgeMs < HANDOFF_WINDOW_MS) {
+            Log.i(TAG, "blocked→blocked handoff $prev → $pkg (age=${prevAgeMs}ms) → bypass quiz")
+            Prefs.touchLastSeen(this, pkg)
+            Prefs.setSessionStart(this, pkg, System.currentTimeMillis())
+            scheduleInAppTimeout(pkg)
+            return
+        }
+
         // First entry / expired session: fresh quiz
         val now = System.currentTimeMillis()
         if (now - lastLaunchMs < 1500L) {
@@ -334,5 +359,8 @@ class BlockerAccessibilityService : AccessibilityService() {
 
     companion object {
         private const val TAG = "QuizGate"
+        // Max age of `prev` (in ms) for a blocked→blocked transition to be considered
+        // a handoff (e.g. share via deep link) rather than a return after a long pause.
+        private const val HANDOFF_WINDOW_MS = 30_000L
     }
 }
