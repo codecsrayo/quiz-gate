@@ -147,8 +147,13 @@ private fun QuizGateScreen(
 
     var pool by remember { mutableStateOf<List<Question>>(emptyList()) }
     var state by remember { mutableStateOf<UiState>(UiState.Loading) }
+    var mode by remember { mutableStateOf<QuizMode.Mode?>(null) }
 
     fun pickRandom(): UiState {
+        val now = System.currentTimeMillis()
+        val anchor = Prefs.getQuizModeAnchorMs(context, now)
+        val activeMode = QuizMode.current(anchor, now)
+        mode = activeMode
         val result = QuizSelector.pick(
             pool = pool,
             includeOfficial = Prefs.isIncludeOfficial(context),
@@ -156,6 +161,7 @@ private fun QuizGateScreen(
             enabledDomains = Prefs.getEnabledDomainsOrNull(context),
             recentIds = Prefs.getRecentQuestionIds(context).toSet(),
             stats = Prefs.getStats(context),
+            mode = activeMode,
         )
         return when (result) {
             QuizSelector.Result.NoCache -> UiState.Error(R.string.quiz_err_no_cache)
@@ -206,6 +212,22 @@ private fun QuizGateScreen(
                 style = MaterialTheme.typography.titleLarge,
                 modifier = Modifier.weight(1f),
             )
+            mode?.let { m ->
+                AssistChip(
+                    onClick = {},
+                    label = {
+                        Text(
+                            stringResource(
+                                when (m) {
+                                    QuizMode.Mode.Novedad -> R.string.quiz_mode_novelty
+                                    QuizMode.Mode.Refuerzo -> R.string.quiz_mode_reinforcement
+                                }
+                            )
+                        )
+                    },
+                )
+                Spacer(Modifier.width(8.dp))
+            }
             FilterChip(
                 selected = lang == "es",
                 onClick = {
