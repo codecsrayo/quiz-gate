@@ -90,8 +90,6 @@
     <string name="quiz_cancel">Cancel</string>
     <string name="quiz_exit">Exit</string>
     <string name="quiz_retry">Retry</string>
-    <string name="quiz_mode_novelty">New</string>
-    <string name="quiz_mode_reinforcement">Review</string>
 
     <!-- Common messages -->
     <string name="error_generic">error</string>
