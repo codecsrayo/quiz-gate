@@ -21,6 +21,7 @@ import androidx.compose.material.icons.filled.Science
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
@@ -117,6 +118,21 @@ class QuizActivity : ComponentActivity() {
         }
     }
 
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        // singleTask reuses this instance. If the practice/gate mode changes
+        // (e.g. practice quiz is alive when AccessibilityService fires the
+        // gate), the captured `practice` value in the original setContent
+        // closure goes stale — the activity would keep practice UI and the
+        // Exit button would dump the user to the home screen. Recreate so
+        // onCreate re-reads the new extras and Compose state resets cleanly.
+        val oldPractice = getIntent()?.getBooleanExtra(EXTRA_PRACTICE_MODE, false) ?: false
+        val newPractice = intent.getBooleanExtra(EXTRA_PRACTICE_MODE, false)
+        setIntent(intent)
+        Log.i(TAG, "QuizActivity onNewIntent oldPractice=$oldPractice newPractice=$newPractice")
+        if (oldPractice != newPractice) recreate()
+    }
+
     override fun onStart() { super.onStart(); Log.i(TAG, "QuizActivity onStart") }
     override fun onResume() { super.onResume(); Log.i(TAG, "QuizActivity onResume") }
     override fun onPause() { Log.i(TAG, "QuizActivity onPause"); super.onPause() }
@@ -139,6 +155,23 @@ private sealed interface UiState {
 
 @Composable
 private fun QuizGateScreen(
+    practiceMode: Boolean,
+    lang: String,
+    onLangChange: (String) -> Unit,
+    onUnlock: () -> Unit,
+    onCancel: () -> Unit,
+) {
+    // Scope every rememberSaveable below under a mode-keyed provider so a
+    // practice session and a gate session never share their visible question
+    // (stats/recent IDs in SharedPreferences are still shared on purpose).
+    val holder = rememberSaveableStateHolder()
+    holder.SaveableStateProvider(key = if (practiceMode) "practice" else "gate") {
+        QuizGateScreenContent(practiceMode, lang, onLangChange, onUnlock, onCancel)
+    }
+}
+
+@Composable
+private fun QuizGateScreenContent(
     practiceMode: Boolean,
     lang: String,
     onLangChange: (String) -> Unit,
