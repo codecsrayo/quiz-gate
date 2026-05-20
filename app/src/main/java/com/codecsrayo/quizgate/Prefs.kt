@@ -134,4 +134,7 @@ object Prefs {
     fun getStats(ctx: Context?): Map<String, QStat> = b(ctx).getStats()
     fun recordShown(ctx: Context?, id: String) = b(ctx).recordShown(id)
     fun recordAnswer(ctx: Context?, id: String, correct: Boolean) = b(ctx).recordAnswer(id, correct)
+
+    fun getQuizModeAnchorMs(ctx: Context?, nowMs: Long = System.currentTimeMillis()): Long =
+        b(ctx).getQuizModeAnchorMs(nowMs)
 }

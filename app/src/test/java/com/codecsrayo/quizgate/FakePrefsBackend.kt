@@ -31,6 +31,7 @@ class FakePrefsBackend : PrefsBackend {
     private var includeSynthetic: Boolean = true
     private var recentQuestion: List<String> = emptyList()
     private var stats: Map<String, Prefs.QStat> = emptyMap()
+    private var quizModeAnchorMs: Long = 0L
 
     var nowProvider: () -> Long = System::currentTimeMillis
 
@@ -130,6 +131,11 @@ class FakePrefsBackend : PrefsBackend {
         val s = cur[id] ?: Prefs.QStat(0, 0, 0)
         cur[id] = if (correct) s.copy(correct = s.correct + 1) else s.copy(wrong = s.wrong + 1)
         stats = cur
+    }
+
+    override fun getQuizModeAnchorMs(nowMs: Long): Long {
+        if (quizModeAnchorMs == 0L) quizModeAnchorMs = nowMs
+        return quizModeAnchorMs
     }
 
     override fun registerChangeListener(listener: SharedPreferences.OnSharedPreferenceChangeListener) {
