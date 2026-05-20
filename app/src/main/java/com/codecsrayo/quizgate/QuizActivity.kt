@@ -209,16 +209,34 @@ private fun QuizGateScreen(
             .systemBarsPadding()
             .padding(16.dp)
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        val headerAccent = mode?.let {
+            when (it) {
+                QuizMode.Mode.Novedad -> Color(0xFF66BB6A)
+                QuizMode.Mode.Refuerzo -> Color(0xFFFFA726)
+            }
+        }
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .fillMaxWidth()
+                .drawWithContent {
+                    drawContent()
+                    if (headerAccent != null) {
+                        val barHeight = 2.dp.toPx()
+                        drawRect(
+                            color = headerAccent,
+                            topLeft = Offset(0f, size.height - barHeight),
+                            size = Size(size.width, barHeight),
+                        )
+                    }
+                }
+                .padding(bottom = 4.dp),
+        ) {
             Text(
                 stringResource(R.string.app_name),
                 style = MaterialTheme.typography.titleLarge,
                 modifier = Modifier.weight(1f),
             )
-            mode?.let { m ->
-                ModeIndicator(m)
-                Spacer(Modifier.width(8.dp))
-            }
             FilterChip(
                 selected = lang == "es",
                 onClick = {
@@ -473,33 +491,6 @@ private fun QuestionView(
                 }
             }
         }
-    }
-}
-
-@Composable
-private fun ModeIndicator(mode: QuizMode.Mode) {
-    val (labelRes, accent) = when (mode) {
-        QuizMode.Mode.Novedad -> R.string.quiz_mode_novelty to Color(0xFF66BB6A)
-        QuizMode.Mode.Refuerzo -> R.string.quiz_mode_reinforcement to Color(0xFFFFA726)
-    }
-    Surface(
-        shape = RoundedCornerShape(8.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant,
-        modifier = Modifier.drawWithContent {
-            drawContent()
-            val barHeight = 2.5.dp.toPx()
-            drawRect(
-                color = accent,
-                topLeft = Offset(0f, size.height - barHeight),
-                size = Size(size.width, barHeight),
-            )
-        },
-    ) {
-        Text(
-            text = stringResource(labelRes),
-            style = MaterialTheme.typography.labelMedium,
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-        )
     }
 }
 
