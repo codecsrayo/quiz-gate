@@ -20,6 +20,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Science
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
@@ -151,12 +152,21 @@ private fun QuizGateScreen(
     var pool by remember { mutableStateOf<List<Question>>(emptyList()) }
     var state by remember { mutableStateOf<UiState>(UiState.Loading) }
     var mode by remember { mutableStateOf<QuizMode.Mode?>(null) }
+    // Survive rotation / process death: keep enough to rebuild the visible
+    // question instead of rerolling (which would drop the user's selection
+    // and waste the shown-count we just incremented).
+    var savedId by rememberSaveable { mutableStateOf<String?>(null) }
+    var savedPerm by rememberSaveable { mutableStateOf<IntArray?>(null) }
+    var savedSelected by rememberSaveable { mutableStateOf(intArrayOf()) }
+    var savedChecked by rememberSaveable { mutableStateOf(false) }
+
+    fun refreshMode() {
+        val now = System.currentTimeMillis()
+        mode = QuizMode.current(Prefs.getQuizModeAnchorMs(context, now), now)
+    }
 
     fun pickRandom(): UiState {
-        val now = System.currentTimeMillis()
-        val anchor = Prefs.getQuizModeAnchorMs(context, now)
-        val activeMode = QuizMode.current(anchor, now)
-        mode = activeMode
+        refreshMode()
         val result = QuizSelector.pick(
             pool = pool,
             includeOfficial = Prefs.isIncludeOfficial(context),
@@ -164,7 +174,7 @@ private fun QuizGateScreen(
             enabledDomains = Prefs.getEnabledDomainsOrNull(context),
             recentIds = Prefs.getRecentQuestionIds(context).toSet(),
             stats = Prefs.getStats(context),
-            mode = activeMode,
+            mode = mode ?: QuizMode.Mode.Refuerzo,
         )
         return when (result) {
             QuizSelector.Result.NoCache -> UiState.Error(R.string.quiz_err_no_cache)
@@ -176,6 +186,10 @@ private fun QuizGateScreen(
                 Prefs.pushRecentQuestionId(context, result.question.id, maxRecent)
                 Prefs.recordShown(context, result.question.id)
                 Log.i("QuizGate", "pickRandom id=${result.question.id} perm=${result.permutation}")
+                savedId = result.question.id
+                savedPerm = result.permutation.toIntArray()
+                savedSelected = intArrayOf()
+                savedChecked = false
                 UiState.Showing(
                     result.question,
                     permutation = result.permutation,
@@ -186,17 +200,35 @@ private fun QuizGateScreen(
         }
     }
 
+    fun restoreOrPick(): UiState {
+        val id = savedId
+        val perm = savedPerm
+        if (id != null && perm != null) {
+            val restored = pool.firstOrNull { it.id == id }
+            if (restored != null) {
+                refreshMode()
+                return UiState.Showing(
+                    question = restored,
+                    permutation = perm.toList(),
+                    selected = savedSelected.toHashSet(),
+                    checked = savedChecked,
+                )
+            }
+        }
+        return pickRandom()
+    }
+
     LaunchedEffect(Unit) {
         val cached = repo.loadCached()
         if (cached.isNotEmpty()) {
             pool = cached
-            state = pickRandom()
+            state = restoreOrPick()
         } else {
             state = UiState.Loading
             val r = repo.refreshFromNetwork()
             r.onSuccess {
                 pool = repo.loadCached()
-                state = pickRandom()
+                state = restoreOrPick()
             }.onFailure {
                 state = UiState.Error(R.string.quiz_err_download, it.message ?: "error")
             }
@@ -298,12 +330,14 @@ private fun QuizGateScreen(
                         } else {
                             setOf(idx)
                         }
+                        savedSelected = next.toIntArray()
                         state = s.copy(selected = next)
                     },
                     onCheck = {
                         val selectedOriginal = s.selected.mapTo(HashSet()) { s.permutation[it] }
                         val correct = selectedOriginal == s.question.correctAnswers()
                         Prefs.recordAnswer(context, s.question.id, correct)
+                        savedChecked = true
                         state = s.copy(checked = true)
                     },
                     onNext = { state = pickRandom() },
