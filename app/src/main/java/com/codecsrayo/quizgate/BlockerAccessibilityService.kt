@@ -104,6 +104,24 @@ class BlockerAccessibilityService : AccessibilityService() {
     private val handler = Handler(Looper.getMainLooper())
     private var pendingTimeout: Runnable? = null
 
+    // Liveness signal for ServiceGuardWorker. HyperOS kills this process and
+    // frequently never rebinds the service; the worker can't tell "enabled and
+    // running" from "enabled on paper but dead" without a heartbeat that only a
+    // live service keeps refreshing.
+    @Volatile private var lastHeartbeatMs = 0L
+    private val heartbeatRunnable = object : Runnable {
+        override fun run() {
+            writeHeartbeat()
+            handler.postDelayed(this, HEARTBEAT_INTERVAL_MS)
+        }
+    }
+
+    private fun writeHeartbeat() {
+        val now = System.currentTimeMillis()
+        lastHeartbeatMs = now
+        runCatching { Prefs.setAccessibilityHeartbeatMs(this, now) }
+    }
+
     override fun onServiceConnected() {
         super.onServiceConnected()
         Log.i(TAG, "AccessibilityService connected")
@@ -115,6 +133,12 @@ class BlockerAccessibilityService : AccessibilityService() {
             .onFailure { Log.e(TAG, "register prefs listener failed", it) }
         runCatching { WatchdogService.start(this) }
             .onFailure { Log.e(TAG, "start watchdog failed", it) }
+        // Begin the heartbeat and clear any stale "service down" alert: being
+        // connected is itself proof the gate is back up.
+        writeHeartbeat()
+        handler.removeCallbacks(heartbeatRunnable)
+        handler.postDelayed(heartbeatRunnable, HEARTBEAT_INTERVAL_MS)
+        runCatching { ServiceAlertNotification.cancel(this) }
     }
 
     private fun loadImePackages(): Set<String> {
@@ -134,6 +158,10 @@ class BlockerAccessibilityService : AccessibilityService() {
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (event == null) return
         if (event.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
+
+        // Throttled heartbeat: keeps the liveness signal fresh during active use
+        // even if the periodic post is delayed (e.g. by Doze).
+        if (System.currentTimeMillis() - lastHeartbeatMs >= HEARTBEAT_INTERVAL_MS) writeHeartbeat()
 
         val pkg = event.packageName?.toString() ?: return
 
@@ -353,6 +381,7 @@ class BlockerAccessibilityService : AccessibilityService() {
 
     override fun onDestroy() {
         cancelTimeout()
+        handler.removeCallbacks(heartbeatRunnable)
         runCatching { Prefs.unregisterChangeListener(this, prefsListener) }
         super.onDestroy()
     }
@@ -362,5 +391,8 @@ class BlockerAccessibilityService : AccessibilityService() {
         // Max age of `prev` (in ms) for a blocked→blocked transition to be considered
         // a handoff (e.g. share via deep link) rather than a return after a long pause.
         private const val HANDOFF_WINDOW_MS = 30_000L
+        // How often the connected service refreshes its liveness heartbeat.
+        // Must stay comfortably below ServiceGuard.STALENESS_THRESHOLD_MS.
+        private const val HEARTBEAT_INTERVAL_MS = 10 * 60_000L
     }
 }
