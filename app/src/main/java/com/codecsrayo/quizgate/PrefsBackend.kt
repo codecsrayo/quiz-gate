@@ -91,6 +91,14 @@ interface PrefsBackend {
     fun getQuizModeAnchorMs(nowMs: Long): Long
 
     /**
+     * Epoch-ms heartbeat refreshed by [BlockerAccessibilityService] while it is
+     * connected. A stale value means the accessibility service was killed and
+     * never rebound (a frequent HyperOS behaviour) — see [ServiceGuard].
+     */
+    fun getAccessibilityHeartbeatMs(): Long
+    fun setAccessibilityHeartbeatMs(ms: Long)
+
+    /**
      * Implementations bridge to the real SharedPreferences change stream when
      * available. In-memory fakes typically no-op these — tests usually drive
      * state changes directly.
@@ -290,6 +298,12 @@ internal class DefaultPrefsBackend(context: Context) : PrefsBackend {
         return nowMs
     }
 
+    override fun getAccessibilityHeartbeatMs(): Long =
+        sp.getLong(KEY_ACCESSIBILITY_HEARTBEAT_MS, 0L)
+    override fun setAccessibilityHeartbeatMs(ms: Long) {
+        sp.edit().putLong(KEY_ACCESSIBILITY_HEARTBEAT_MS, ms).apply()
+    }
+
     override fun registerChangeListener(
         listener: SharedPreferences.OnSharedPreferenceChangeListener,
     ) {
@@ -324,6 +338,7 @@ internal class DefaultPrefsBackend(context: Context) : PrefsBackend {
         const val KEY_GLOSSARY_ACTIVE_END_MIN = "glossary_active_end_min"
         const val KEY_RECENT_GLOSSARY_IDS = "recent_glossary_ids"
         const val KEY_QUIZ_MODE_ANCHOR_MS = "quiz_mode_anchor_ms"
+        const val KEY_ACCESSIBILITY_HEARTBEAT_MS = "accessibility_heartbeat_ms"
         const val PENDING_UNLOCK_TTL_MS = 60_000L
         const val SESSION_WINDOW_MS = 5 * 60_000L
         const val KEY_LAST_SEEN_PREFIX = "last_seen_"

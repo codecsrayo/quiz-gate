@@ -137,4 +137,8 @@ object Prefs {
 
     fun getQuizModeAnchorMs(ctx: Context?, nowMs: Long = System.currentTimeMillis()): Long =
         b(ctx).getQuizModeAnchorMs(nowMs)
+
+    fun getAccessibilityHeartbeatMs(ctx: Context?): Long = b(ctx).getAccessibilityHeartbeatMs()
+    fun setAccessibilityHeartbeatMs(ctx: Context?, ms: Long) =
+        b(ctx).setAccessibilityHeartbeatMs(ms)
 }

@@ -32,6 +32,7 @@ class FakePrefsBackend : PrefsBackend {
     private var recentQuestion: List<String> = emptyList()
     private var stats: Map<String, Prefs.QStat> = emptyMap()
     private var quizModeAnchorMs: Long = 0L
+    private var accessibilityHeartbeatMs: Long = 0L
 
     var nowProvider: () -> Long = System::currentTimeMillis
 
@@ -137,6 +138,9 @@ class FakePrefsBackend : PrefsBackend {
         if (quizModeAnchorMs == 0L) quizModeAnchorMs = nowMs
         return quizModeAnchorMs
     }
+
+    override fun getAccessibilityHeartbeatMs(): Long = accessibilityHeartbeatMs
+    override fun setAccessibilityHeartbeatMs(ms: Long) { accessibilityHeartbeatMs = ms }
 
     override fun registerChangeListener(listener: SharedPreferences.OnSharedPreferenceChangeListener) {
         // no-op
