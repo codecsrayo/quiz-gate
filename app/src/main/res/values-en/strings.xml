@@ -110,4 +110,10 @@
     <string name="watchdog_notif_text">Watching WhatsApp, Facebook and Instagram</string>
     <string name="watchdog_channel_name">Quiz Gate</string>
     <string name="watchdog_channel_desc">Keeps blocking active in the background</string>
+
+    <!-- Service-down alert -->
+    <string name="service_alert_channel_name">Blocking status</string>
+    <string name="service_alert_channel_desc">Warns when app blocking stops working.</string>
+    <string name="service_alert_title">Blocking is disabled</string>
+    <string name="service_alert_text">HyperOS stopped Quiz Gate\'s Accessibility service. Tap to re-enable it.</string>
 </resources>

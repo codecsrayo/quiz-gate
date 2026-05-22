@@ -110,4 +110,10 @@
     <string name="watchdog_notif_text">Vigilando WhatsApp, Facebook e Instagram</string>
     <string name="watchdog_channel_name">Quiz Gate</string>
     <string name="watchdog_channel_desc">Mantiene el bloqueo activo en segundo plano</string>
+
+    <!-- Alerta de servicio caído -->
+    <string name="service_alert_channel_name">Estado del bloqueo</string>
+    <string name="service_alert_channel_desc">Avisa cuando el bloqueo de apps deja de funcionar.</string>
+    <string name="service_alert_title">El bloqueo está desactivado</string>
+    <string name="service_alert_text">HyperOS detuvo el Servicio de Accesibilidad de Quiz Gate. Toca para reactivarlo.</string>
 </resources>
