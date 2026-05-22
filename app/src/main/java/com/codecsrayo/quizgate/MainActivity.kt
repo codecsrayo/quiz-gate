@@ -73,6 +73,7 @@ class MainActivity : ComponentActivity() {
         WatchdogService.start(this)
         GlossaryNotifications.ensureChannel(this)
         GlossaryPushWorker.applyFromPrefs(this)
+        ServiceGuardWorker.schedule(this)
 
         setContent {
             AskTheme {
